@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allied Services - Telecaller Tracking Dashboard</title>
+  <!-- Google Fonts: Outfit and Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Decorative Gradient Header Bar -->
+  <div class="top-gradient-bar"></div>
+
+  <div class="app-container">
+    <!-- Header Block -->
+    <header class="app-header animate-fade-in">
+      <div class="header-logo">
+        <div class="logo-img-container">
+          <img src="logo.png" alt="Allied Services Logo" class="app-logo-img">
+        </div>
+        <div class="logo-text">
+          <h1>Daily Calling <span class="accent-text">Dashboard</span></h1>
+          <p>Allied Services Telecaller Portal</p>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <div class="date-badge">
+          <i data-lucide="calendar"></i>
+          <span id="current-date">May 22, 2026</span>
+        </div>
+        
+        <!-- Google Sheet Sync Status Indicator Button -->
+        <button id="sync-status-btn" class="status-badge state-disconnected" onclick="openSettings()">
+          <span class="pulse-indicator"></span>
+          <i data-lucide="database"></i>
+          <span id="sync-status-text">Sheets Offline</span>
+        </button>
+
+        <button class="icon-btn" onclick="openSettings()" id="settings-btn" title="Google Sheets Setup">
+          <i data-lucide="settings"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Analytics Dashboard Cards -->
+    <section class="analytics-container animate-slide-down">
+      <div class="stat-card card-glow-indigo">
+        <div class="stat-icon bg-soft-indigo">
+          <i data-lucide="users"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label">Total Calls Today</span>
+          <h3 id="stat-total-calls">0</h3>
+        </div>
+      </div>
+
+      <div class="stat-card card-glow-emerald">
+        <div class="stat-icon bg-soft-emerald">
+          <i data-lucide="calendar-check"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label">Appointments Secured</span>
+          <h3 id="stat-appointments">0 <span class="percentage" id="stat-appointments-pct">(0%)</span></h3>
+        </div>
+      </div>
+
+      <div class="stat-card card-glow-purple">
+        <div class="stat-icon bg-soft-purple">
+          <i data-lucide="file-text"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label">BI Requests</span>
+          <h3 id="stat-bi-requests">0</h3>
+        </div>
+      </div>
+
+      <div class="stat-card card-glow-amber">
+        <div class="stat-icon bg-soft-amber">
+          <i data-lucide="heart-handshake"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label">Interested Leads</span>
+          <h3 id="stat-interested">0 <span class="percentage" id="stat-interested-pct">(0%)</span></h3>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Workspace Layout -->
+    <main class="workspace-grid" id="workspace-grid-container">
+      <!-- Left Column: Form Panel -->
+      <section class="form-panel animate-slide-right" id="form-panel-section">
+        <div class="panel-header" id="form-header-container">
+          <i data-lucide="user-plus" id="form-header-icon"></i>
+          <h2 id="form-header-title">Log New Call Update</h2>
+        </div>
+        
+        <form id="call-form" onsubmit="handleFormSubmit(event)">
+          <!-- Caller Agent Name -->
+          <div class="form-group">
+            <label for="caller-name">
+              Caller Agent Name <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i data-lucide="user-check" class="input-icon"></i>
+              <input type="text" id="caller-name" placeholder="Enter your name" required autocomplete="off">
+            </div>
+          </div>
+          <!-- Customer Name -->
+          <div class="form-group">
+            <label for="customer-name">
+              Customer Name <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i data-lucide="user" class="input-icon"></i>
+              <input type="text" id="customer-name" placeholder="Amit Kumar" required autocomplete="off">
+            </div>
+          </div>
+
+          <!-- Mobile Number -->
+          <div class="form-group">
+            <label for="mobile-number">
+              Mobile Number <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i data-lucide="smartphone" class="input-icon"></i>
+              <input type="tel" id="mobile-number" placeholder="10-digit mobile number" required pattern="[0-9]{10}" title="Please enter a valid 10-digit mobile number" autocomplete="off">
+            </div>
+            <span class="field-hint">Format: 10 digits without spaces or country code</span>
+            <div id="duplicate-warning-container" class="duplicate-warning hidden"></div>
+          </div>
+
+          <!-- Age and Gender Grid -->
+          <div class="form-row-grid">
+            <!-- Age (Optional) -->
+            <div class="form-group">
+              <label for="customer-age">
+                Age <span class="optional">(Optional)</span>
+              </label>
+              <div class="input-wrapper">
+                <i data-lucide="badge-help" class="input-icon"></i>
+                <input type="number" id="customer-age" placeholder="Age" min="1" max="120">
+              </div>
+            </div>
+
+            <!-- Gender -->
+            <div class="form-group">
+              <label for="customer-gender">
+                Gender <span class="required">*</span>
+              </label>
+              <div class="input-wrapper">
+                <i data-lucide="venus-mars" class="input-icon"></i>
+                <select id="customer-gender" required>
+                  <option value="" disabled selected>Select...</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Call Status (Interested / Thinking / Not Interested / Lead) -->
+          <div class="form-group">
+            <label>
+              Call Status <span class="required">*</span>
+            </label>
+            <div class="segmented-control">
+              <label class="segment-option">
+                <input type="radio" name="call-status" value="Interested" checked required>
+                <span class="segment-btn badge-interested">
+                  <i data-lucide="thumbs-up"></i>
+                  Interested
+                </span>
+              </label>
+              <label class="segment-option">
+                <input type="radio" name="call-status" value="Thinking" required>
+                <span class="segment-btn badge-thinking">
+                  <i data-lucide="message-square-more"></i>
+                  Thinking
+                </span>
+              </label>
+              <label class="segment-option">
+                <input type="radio" name="call-status" value="Not Interested" required>
+                <span class="segment-btn badge-not-interested">
+                  <i data-lucide="thumbs-down"></i>
+                  Not Interested
+                </span>
+              </label>
+              <label class="segment-option">
+                <input type="radio" name="call-status" value="Lead" required>
+                <span class="segment-btn badge-lead">
+                  <i data-lucide="sparkles"></i>
+                  Lead
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Appointment Given Toggle Row -->
+          <div class="form-group-toggle" id="appointment-toggle-row">
+            <div class="toggle-info">
+              <label for="appointment-given">Appointment Given?</label>
+              <p class="field-hint">Has customer agreed to an appointment?</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="appointment-given" onchange="toggleAppointmentField()">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Date of Appointment (Conditional) -->
+          <div class="form-group conditional-field" id="appointment-date-group">
+            <label for="appointment-date">
+              Appointment Date & Time <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i data-lucide="calendar" class="input-icon"></i>
+              <input type="datetime-local" id="appointment-date">
+            </div>
+          </div>
+
+          <hr class="form-divider">
+
+          <!-- BI (Benefit Illustration) Required Toggle Row -->
+          <div class="form-group-toggle">
+            <div class="toggle-info">
+              <label for="bi-required">BI Required?</label>
+              <p class="field-hint">Does the customer need a Benefit Illustration?</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="bi-required" onchange="toggleBiField()">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- BI Product Category (Conditional) -->
+          <div class="form-group conditional-field" id="bi-product-group">
+            <label for="bi-product">
+              Select Product Category <span class="required">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i data-lucide="box" class="input-icon"></i>
+              <select id="bi-product">
+                <option value="" disabled selected>Select Product Category...</option>
+                <option value="Retirement">Retirement</option>
+                <option value="Savings">Savings</option>
+                <option value="Term">Term</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Call Comments / Remarks -->
+          <div class="form-group">
+            <label for="call-comments">
+              Call Comments / Remarks <span class="optional">(Optional)</span>
+            </label>
+            <div class="input-wrapper">
+              <i data-lucide="message-square" class="input-icon" style="top: 0.85rem;"></i>
+              <textarea id="call-comments" placeholder="Enter remarks about the client call..." autocomplete="off"></textarea>
+            </div>
+          </div>
+
+          <!-- Form Buttons -->
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" onclick="resetForm()">
+              <i data-lucide="refresh-cw"></i>
+              Clear
+            </button>
+            <button type="submit" class="btn-primary">
+              <i data-lucide="save"></i>
+              Save Call Record
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Right Column: Call History Table & Utilities -->
+      <section class="table-panel animate-slide-left" id="table-panel-section">
+        <div class="panel-header-row">
+          <div class="panel-header">
+            <i data-lucide="list-checks"></i>
+            <h2>Team Calling History</h2>
+            <button class="btn-icon-only btn-refresh" id="refresh-sync-btn" onclick="fetchRemoteLogs()" title="Sync & Fetch Remote Logs" style="padding: 4px; border: none; background: transparent; width: 28px; height: 28px; border-radius: 50%;">
+              <i data-lucide="refresh-cw" id="refresh-icon" style="width: 16px; height: 16px; color: var(--primary);"></i>
+            </button>
+          </div>
+          
+          <div class="action-buttons">
+            <button class="btn-soft" onclick="window.print()" title="Print Summary Report">
+              <i data-lucide="printer"></i>
+              Print
+            </button>
+            <button class="btn-soft" id="export-csv-btn" onclick="exportCallLogsToCSV()" title="Export Today's Logs to Excel/CSV">
+              <i data-lucide="download"></i>
+              Export CSV
+            </button>
+            <button class="btn-danger-soft" onclick="clearTodayLogs()" title="Clear Dashboard Logs">
+              <i data-lucide="trash-2"></i>
+              Clear All
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter and Search Row -->
+        <div class="filter-search-row">
+          <div class="search-box">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="search-input" placeholder="Search by name or mobile..." oninput="filterCallHistory()">
+          </div>
+
+          <div class="filter-group">
+            <div class="select-wrapper">
+              <select id="filter-status" onchange="filterCallHistory()">
+                <option value="All">All Statuses</option>
+                <option value="Interested">Interested</option>
+                <option value="Thinking">Thinking</option>
+                <option value="Not Interested">Not Interested</option>
+                <option value="Lead">Lead</option>
+              </select>
+            </div>
+
+            <div class="select-wrapper">
+              <select id="filter-appointment" onchange="filterCallHistory()">
+                <option value="All">All Appointments</option>
+                <option value="Yes">Appointment Given</option>
+                <option value="No">No Appointment</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Call Logs Scrollable Container -->
+        <div class="table-responsive">
+          <table class="history-table" id="history-table">
+            <thead>
+              <tr>
+                <th>Customer Details</th>
+                <th>Gender & Age</th>
+                <th>Status</th>
+                <th>Appointment Details</th>
+                <th>BI Request</th>
+                <th>Sync Status</th>
+                <th class="actions-header">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body">
+              <!-- Dynamically populated rows -->
+              <tr class="empty-state-row">
+                <td colspan="7">
+                  <div class="empty-state">
+                    <i data-lucide="clipboard-list" class="empty-icon"></i>
+                    <h3>No calls logged today</h3>
+                    <p>Use the form on the left to start tracking calls.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Mobile Cards List Container -->
+        <div class="mobile-cards-container" id="mobile-cards-list"></div>
+        
+        <!-- Table Summary Row -->
+        <div class="table-footer">
+          <span id="showing-records-text">Showing 0 of 0 entries</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- Mobile Bottom Tab Navigation -->
+    <div class="mobile-nav-bar">
+      <button class="mobile-nav-item active" id="nav-btn-form" onclick="switchMobileTab('form')">
+        <i data-lucide="edit-3"></i>
+        <span>Log Call</span>
+      </button>
+      <button class="mobile-nav-item" id="nav-btn-history" onclick="switchMobileTab('history')">
+        <i data-lucide="list-checks"></i>
+        <span>Team History</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings / Google Sheets Setup Modal -->
+  <div class="modal-overlay" id="settings-modal" style="display: none;">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="settings" class="indigo-text"></i>
+          <h3>Google Sheets Sync Settings</h3>
+        </div>
+        <button class="close-btn" onclick="closeSettings()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-intro">
+          Automatically push every calling update directly into a central Google Sheet. Set up Google Sheets Sync in a few quick steps:
+        </p>
+        
+        <!-- Setup Accordion Steps -->
+        <div class="setup-steps">
+          <div class="step-card">
+            <span class="step-number">1</span>
+            <div class="step-info">
+              <h4>Get the Apps Script Code</h4>
+              <p>We created a file named <code>google-script.js</code> in your folder. Copy its contents entirely.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <span class="step-number">2</span>
+            <div class="step-info">
+              <h4>Open Apps Script in Sheet</h4>
+              <p>In your Google Sheet, click <strong>Extensions</strong> > <strong>Apps Script</strong>. Paste the code there, save, and deploy it as a <strong>Web App</strong> (Execute as: "Me", Access: "Anyone").</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <span class="step-number">3</span>
+            <div class="step-info">
+              <h4>Paste Web App URL</h4>
+              <p>Paste the deployed Web App URL (ends with <code>/exec</code>) in the field below.</p>
+            </div>
+          </div>
+        </div>
+
+        <hr class="modal-divider">
+
+        <!-- Input for Web App URL -->
+        <div class="form-group">
+          <label for="web-app-url">Google Web App URL (Deploy Executable Link)</label>
+          <div class="input-wrapper">
+            <i data-lucide="link" class="input-icon"></i>
+            <input type="url" id="web-app-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+          </div>
+        </div>
+
+        <!-- Connection Test Block -->
+        <div class="test-connection-row">
+          <button type="button" class="btn-primary" id="test-conn-btn" onclick="testSheetConnection()">
+            <i data-lucide="radio"></i>
+            Test Sheet Connection
+          </button>
+          <span id="test-conn-status" class="test-status-text">Not Configured</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+        <button class="btn-primary" onclick="saveSettings()">Save & Sync Config</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Application Script -->
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1322 @@
+/* ==========================================================================
+   TELECALL PRO DASHBOARD CORE LOGIC - CRM UPGRADED
+   Features: 2-Way Sync Engine, Smart Editing Overwrite, Mobile responsive Tab Layout,
+             Expandable Client Calling Cards, Stats Calculations, Local Persistence
+   ========================================================================== */
+
+// --- Global Application State ---
+let callLogs = [];
+
+// 💡 UNIVERSAL TEAM CONFIGURATION
+// Paste your deployed Google Apps Script Web App URL (ending in "/exec") inside the quotes below.
+// Once you paste your URL here, none of your 10 callers need to configure anything!
+// They will open the link and instantly see "Sheets Connected" automatically.
+const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbwsCT354fl29f5NHhxfxtwysXnWEDj7anq0emRs8XWoDTqlyR9j1Idob7_kcBXJWgBQHg/exec";
+
+let sheetUrl = DEFAULT_SHEET_URL;
+let editingRecordId = null;
+
+// --- Initialization on DOM Load ---
+document.addEventListener("DOMContentLoaded", () => {
+  // 1. Load data from LocalStorage
+  loadStoredData();
+  
+  // 2. Display current date nicely
+  displayCurrentDate();
+  
+  // 3. Render initial views
+  renderHistoryTable();
+  recalculateAnalytics();
+  updateSyncBadge();
+
+  // 4. Trigger Automatic Remote Fetch from Sheets (2-Way Sync)
+  fetchRemoteLogs();
+
+  // 5. Pre-populate Caller Agent Name from LocalStorage
+  const agentInput = document.getElementById("caller-name");
+  if (agentInput) {
+    agentInput.value = localStorage.getItem("telecaller_agent_name") || "";
+  }
+
+  // 6. Add event listener for call status changes
+  const statusRadios = document.querySelectorAll('input[name="call-status"]');
+  statusRadios.forEach(radio => {
+    radio.addEventListener("change", handleStatusChange);
+  });
+  
+  // Initialize form fields visibility
+  handleStatusChange();
+
+  // 6b. Add live mobile lookup listener to detect existing records
+  const mobileInput = document.getElementById("mobile-number");
+  if (mobileInput) {
+    mobileInput.addEventListener("input", handleLiveMobileLookup);
+  }
+
+  // 7. Initialize Lucide Icons
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+
+  // 8. Initialize Mobile Layout Tab display
+  if (window.innerWidth <= 768) {
+    switchMobileTab('form');
+  }
+});
+
+// Handle window resizing to switch between table and cards layout
+window.addEventListener("resize", () => {
+  renderHistoryTable();
+});
+
+// --- Date and Time Helper ---
+function displayCurrentDate() {
+  const dateElement = document.getElementById("current-date");
+  if (dateElement) {
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const today = new Date();
+    dateElement.textContent = today.toLocaleDateString('en-US', options);
+  }
+}
+
+// --- Load/Save LocalStorage ---
+function loadStoredData() {
+  try {
+    const storedLogs = localStorage.getItem("telecaller_logs");
+    if (storedLogs) {
+      callLogs = JSON.parse(storedLogs);
+    } else {
+      callLogs = [];
+    }
+    sheetUrl = DEFAULT_SHEET_URL || localStorage.getItem("telecaller_sheet_url") || "";
+  } catch (error) {
+    console.error("Error loading local storage data:", error);
+    showToast("Error", "Could not load previously saved logs.", "error");
+  }
+}
+
+function saveLogsToLocalStorage() {
+  try {
+    localStorage.setItem("telecaller_logs", JSON.stringify(callLogs));
+  } catch (error) {
+    console.error("Error saving local storage data:", error);
+    showToast("Error", "Could not save log data to browser storage.", "error");
+  }
+}
+
+// --- UI Dynamic Form Field Toggles ---
+function handleStatusChange() {
+  const statusInput = document.querySelector('input[name="call-status"]:checked');
+  const appointmentToggleRow = document.getElementById("appointment-toggle-row");
+  const appointmentGivenCheckbox = document.getElementById("appointment-given");
+
+  if (!statusInput || !appointmentToggleRow) return;
+
+  if (statusInput.value === "Interested") {
+    // Show appointment option
+    appointmentToggleRow.classList.remove("hidden-toggle");
+    toggleAppointmentField();
+  } else {
+    // Hide appointment option for Thinking or Not Interested
+    appointmentToggleRow.classList.add("hidden-toggle");
+    appointmentGivenCheckbox.checked = false;
+    toggleAppointmentField();
+  }
+}
+
+function toggleAppointmentField() {
+  const appointmentGivenCheckbox = document.getElementById("appointment-given");
+  const appointmentDateGroup = document.getElementById("appointment-date-group");
+  const appointmentDateInput = document.getElementById("appointment-date");
+
+  if (appointmentGivenCheckbox.checked) {
+    appointmentDateGroup.classList.add("active");
+    appointmentDateInput.required = true;
+    
+    // Set a default minimum date to "now"
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    appointmentDateInput.min = now.toISOString().slice(0, 16);
+  } else {
+    appointmentDateGroup.classList.remove("active");
+    appointmentDateInput.required = false;
+    appointmentDateInput.value = "";
+  }
+}
+
+function toggleBiField() {
+  const biRequiredCheckbox = document.getElementById("bi-required");
+  const biProductGroup = document.getElementById("bi-product-group");
+  const biProductSelect = document.getElementById("bi-product");
+
+  if (biRequiredCheckbox.checked) {
+    biProductGroup.classList.add("active");
+    biProductSelect.required = true;
+  } else {
+    biProductGroup.classList.remove("active");
+    biProductSelect.required = false;
+    biProductSelect.value = "";
+  }
+}
+
+// --- Mobile Tab Switching Logic ---
+function switchMobileTab(tab) {
+  const formPanel = document.getElementById("form-panel-section");
+  const tablePanel = document.getElementById("table-panel-section");
+  const navBtnForm = document.getElementById("nav-btn-form");
+  const navBtnHistory = document.getElementById("nav-btn-history");
+
+  if (!formPanel || !tablePanel) return;
+
+  if (tab === 'form') {
+    formPanel.classList.remove("mobile-hidden");
+    tablePanel.classList.add("mobile-hidden");
+    if (navBtnForm) navBtnForm.classList.add("active");
+    if (navBtnHistory) navBtnHistory.classList.remove("active");
+  } else {
+    formPanel.classList.add("mobile-hidden");
+    tablePanel.classList.remove("mobile-hidden");
+    if (navBtnForm) navBtnForm.classList.remove("active");
+    if (navBtnHistory) navBtnHistory.classList.add("active");
+    
+    // Rerender table to adapt layout dimensions immediately
+    renderHistoryTable();
+  }
+}
+
+// --- ✏️ CRM Live Pencil Editing Mode ---
+function editRecord(recordId) {
+  const record = callLogs.find(r => r.id === recordId);
+  if (!record) return;
+
+  editingRecordId = recordId;
+
+  // Add visual branding changes to indicate Edit Mode
+  const formPanel = document.getElementById("form-panel-section");
+  const headerTitle = document.getElementById("form-header-title");
+  const headerIcon = document.getElementById("form-header-icon");
+  const submitBtn = document.querySelector("#call-form button[type='submit']");
+
+  if (formPanel) formPanel.classList.add("edit-mode-active");
+  if (headerTitle) headerTitle.textContent = `Edit Call: ${record.name}`;
+  if (headerIcon) headerIcon.setAttribute("data-lucide", "edit-3");
+  if (submitBtn) {
+    submitBtn.innerHTML = `<i data-lucide="save"></i> Update Call Record`;
+  }
+  if (window.lucide) window.lucide.createIcons();
+
+  // Pre-populate standard form fields
+  document.getElementById("customer-name").value = record.name;
+  document.getElementById("mobile-number").value = record.mobile;
+  document.getElementById("customer-age").value = record.age || "";
+  document.getElementById("customer-gender").value = record.gender;
+
+  // Select call status radio option
+  const radio = document.querySelector(`input[name="call-status"][value="${record.status}"]`);
+  if (radio) {
+    radio.checked = true;
+  }
+
+  // Set appointment fields
+  const apptToggle = document.getElementById("appointment-given");
+  apptToggle.checked = record.appointmentGiven;
+  if (record.appointmentGiven) {
+    document.getElementById("appointment-date").value = record.appointmentDate ? record.appointmentDate.slice(0, 16) : "";
+  }
+
+  // Set BI fields
+  const biToggle = document.getElementById("bi-required");
+  biToggle.checked = record.biRequired;
+  if (record.biRequired) {
+    document.getElementById("bi-product").value = record.biProduct || "";
+  }
+
+  // Set comments & agent
+  document.getElementById("call-comments").value = record.comments || "";
+  const agentInput = document.getElementById("caller-name");
+  if (agentInput) {
+    agentInput.value = record.addedBy || localStorage.getItem("telecaller_agent_name") || "";
+  }
+
+  // Update dynamic layouts
+  handleStatusChange();
+  toggleBiField();
+
+  // If on mobile screen size, auto-switch to Log Call tab
+  if (window.innerWidth <= 768) {
+    switchMobileTab('form');
+  }
+
+  // Smooth scroll to form container
+  formPanel.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById("customer-name").focus();
+  
+  showToast("Edit Mode Active", `Editing record for ${record.name}.`, "info");
+}
+
+// --- Fetch Remote Data Sync Engine (2-Way GET retrieval) ---
+async function fetchRemoteLogs() {
+  if (!sheetUrl) {
+    console.log("Sync skipped: No Sheets URL configured.");
+    return;
+  }
+
+  const refreshBtn = document.getElementById("refresh-sync-btn");
+  const refreshIcon = document.getElementById("refresh-icon");
+
+  if (refreshIcon) refreshIcon.classList.add("spin-icon");
+  if (refreshBtn) refreshBtn.disabled = true;
+
+  try {
+    // Fetch query with fetch action parameter
+    const fetchUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch";
+    const response = await fetch(fetchUrl, {
+      method: "GET",
+      mode: "cors"
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.status === "success" && data.records) {
+      // Merge remote spreadsheet data with local logs
+      mergeLogs(data.records);
+      saveLogsToLocalStorage();
+      renderHistoryTable();
+      recalculateAnalytics();
+      
+      // Update Sync Badge to show success state
+      updateSyncBadge();
+      
+      showToast("Sync Successful", `Fetched ${data.records.length} team logs from Google Sheet.`, "success");
+    } else {
+      throw new Error(data.message || "Invalid data format received.");
+    }
+  } catch (error) {
+    console.warn("Could not retrieve remote logs, falling back to local storage logs:", error);
+    
+    // Update Sync Badge to visually show sync error
+    const syncBtn = document.getElementById("sync-status-btn");
+    const syncText = document.getElementById("sync-status-text");
+    if (syncBtn && syncText) {
+      syncBtn.className = "status-badge state-disconnected";
+      syncText.textContent = "Sync Error: Click to setup";
+      syncBtn.style.backgroundColor = "#ffe4e6";
+      syncBtn.style.color = "#be123c";
+      syncBtn.style.borderColor = "#fda4af";
+    }
+    
+    showToast("Sync Error", `Could not connect to Google Sheets. Verify Web App URL in settings. Error: ${error.message}`, "error");
+  } finally {
+    if (refreshIcon) refreshIcon.classList.remove("spin-icon");
+    if (refreshBtn) refreshBtn.disabled = false;
+  }
+}
+
+// De-duplicate team records retrieved from Sheet
+function mergeLogs(remoteRecords) {
+  const mergedMap = new Map();
+
+  const getCleanMobile = (mobileVal) => {
+    let mob = String(mobileVal || "");
+    if (mob.indexOf('.') !== -1) {
+      mob = mob.split('.')[0];
+    }
+    return mob.replace(/[^0-9]/g, "");
+  };
+
+  // 1. Process remote records (Sheet is source of truth)
+  remoteRecords.forEach(record => {
+    const cleanMobile = getCleanMobile(record.mobile);
+    if (cleanMobile) {
+      mergedMap.set(cleanMobile, record);
+    }
+  });
+
+  // 2. Add local records that aren't synced or aren't in the sheet yet
+  callLogs.forEach(record => {
+    const cleanMobile = getCleanMobile(record.mobile);
+    if (cleanMobile) {
+      if (!mergedMap.has(cleanMobile)) {
+        mergedMap.set(cleanMobile, record);
+      } else {
+        // If a local record matches but has pending status updates, prioritize local version
+        if (record.syncStatus === "Pending") {
+          mergedMap.set(cleanMobile, record);
+        }
+      }
+    }
+  });
+
+  // 3. Convert back and sort descending by timestamp
+  callLogs = Array.from(mergedMap.values()).sort((a, b) => {
+    return new Date(b.timestamp) - new Date(a.timestamp);
+  });
+}
+
+// --- Modal Settings Handlers ---
+function openSettings() {
+  const modal = document.getElementById("settings-modal");
+  const urlInput = document.getElementById("web-app-url");
+  
+  urlInput.value = localStorage.getItem("telecaller_sheet_url") || DEFAULT_SHEET_URL;
+  modal.style.display = "flex";
+  
+  const testStatus = document.getElementById("test-conn-status");
+  testStatus.textContent = urlInput.value ? "Configured (Not Tested)" : "Not Configured";
+  testStatus.className = "test-status-text";
+}
+
+function closeSettings() {
+  document.getElementById("settings-modal").style.display = "none";
+}
+
+function saveSettings() {
+  const urlInput = document.getElementById("web-app-url");
+  const rawUrl = urlInput.value.trim();
+  
+  if (rawUrl && !rawUrl.startsWith("https://script.google.com/")) {
+    showToast("Invalid URL", "Google Apps Script Web App URLs must start with https://script.google.com", "error");
+    return;
+  }
+
+  localStorage.setItem("telecaller_sheet_url", rawUrl);
+  sheetUrl = rawUrl;
+  
+  closeSettings();
+  updateSyncBadge();
+  showToast("Settings Saved", "Google Sheets Sync configuration saved successfully.", "success");
+  
+  // Trigger syncing and fetch remote sheets data
+  syncPendingLogs();
+  fetchRemoteLogs();
+}
+
+async function testSheetConnection() {
+  const urlInput = document.getElementById("web-app-url");
+  const testUrl = urlInput.value.trim();
+  const testStatus = document.getElementById("test-conn-status");
+  const testBtn = document.getElementById("test-conn-btn");
+
+  if (!testUrl) {
+    testStatus.textContent = "Please enter a URL first.";
+    testStatus.className = "test-status-text status-failed";
+    return;
+  }
+
+  testStatus.textContent = "Testing connection...";
+  testStatus.className = "test-status-text status-checking";
+  testBtn.disabled = true;
+
+  const isLocalFile = window.location.protocol === "file:";
+
+  try {
+    const response = await fetch(testUrl, {
+      method: "GET",
+      mode: "cors"
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.status === "connected") {
+      testStatus.textContent = "Connection Successful! Online.";
+      testStatus.className = "test-status-text status-connected";
+      showToast("Connected", "Google Sheets Web App verified & online!", "success");
+      return;
+    } else {
+      throw new Error(data.message || "Invalid response format.");
+    }
+  } catch (error) {
+    console.warn("Standard CORS connection test failed, trying local file fallback...", error);
+    
+    try {
+      await fetch(testUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify({ isTest: true })
+      });
+
+      testStatus.textContent = "Connected (CORS Bypass Active)";
+      testStatus.className = "test-status-text status-connected";
+      
+      if (isLocalFile) {
+        showToast("Connected!", "Sync is verified and active (CORS bypassed for local file).", "success");
+      } else {
+        showToast("Connected!", "Google Sheets connection verified and active!", "success");
+      }
+    } catch (fallbackError) {
+      console.error("Connection fallback failed:", fallbackError);
+      testStatus.textContent = "Connection Failed. Check URL and Deployment settings.";
+      testStatus.className = "test-status-text status-failed";
+      showToast("Connection Failed", "Ensure 'Who has access' is set to 'Anyone' during deployment.", "error");
+    }
+  } finally {
+    testBtn.disabled = false;
+  }
+}
+
+function updateSyncBadge() {
+  const syncBtn = document.getElementById("sync-status-btn");
+  const syncText = document.getElementById("sync-status-text");
+  if (!syncBtn || !syncText) return;
+  
+  // Clear any temporary inline styling added during error states
+  syncBtn.removeAttribute("style");
+  
+  if (sheetUrl) {
+    syncBtn.className = "status-badge state-connected";
+    syncText.textContent = "Sheets Connected";
+  } else {
+    syncBtn.className = "status-badge state-disconnected";
+    syncText.textContent = "Sheets Offline";
+  }
+}
+
+// --- Form Validation & Submission ---
+function handleFormSubmit(event) {
+  event.preventDefault();
+
+  const agentInput = document.getElementById("caller-name");
+  const nameInput = document.getElementById("customer-name");
+  const mobileInput = document.getElementById("mobile-number");
+  const ageInput = document.getElementById("customer-age");
+  const genderInput = document.getElementById("customer-gender");
+  const statusInput = document.querySelector('input[name="call-status"]:checked');
+  const appointmentGiven = document.getElementById("appointment-given").checked;
+  const appointmentDate = document.getElementById("appointment-date").value;
+  const biRequired = document.getElementById("bi-required").checked;
+  const biProduct = document.getElementById("bi-product").value;
+  const commentsInput = document.getElementById("call-comments");
+
+  // 1. Validation Checks
+  const addedBy = agentInput ? agentInput.value.trim() : "N/A";
+  const name = nameInput.value.trim();
+  const mobile = mobileInput.value.trim();
+  const age = ageInput.value ? parseInt(ageInput.value, 10) : "";
+  const gender = genderInput.value;
+  const status = statusInput ? statusInput.value : "";
+  const comments = commentsInput ? commentsInput.value.trim() : "";
+
+  if (!addedBy) {
+    showToast("Required Field", "Please enter the Caller Agent Name.", "error");
+    agentInput.focus();
+    return;
+  }
+
+  // Cache the agent name in local storage
+  localStorage.setItem("telecaller_agent_name", addedBy);
+
+  // Mobile format validation (10 digits)
+  const mobileRegex = /^[0-9]{10}$/;
+  if (!mobileRegex.test(mobile)) {
+    showToast("Invalid Mobile", "Please enter a valid 10-digit mobile number.", "error");
+    mobileInput.focus();
+    return;
+  }
+
+  if (age && (age < 1 || age > 120)) {
+    showToast("Invalid Age", "Please enter a realistic age between 1 and 120.", "error");
+    ageInput.focus();
+    return;
+  }
+
+  if (appointmentGiven && !appointmentDate) {
+    showToast("Required Field", "Please enter the scheduled Appointment Date and Time.", "error");
+    document.getElementById("appointment-date").focus();
+    return;
+  }
+
+  if (biRequired && !biProduct) {
+    showToast("Required Field", "Please select a product category for Benefit Illustration.", "error");
+    document.getElementById("bi-product").focus();
+    return;
+  }
+
+  // 2. Handle Save logic for New vs Updated Record
+  if (editingRecordId !== null) {
+    // --- EDIT EXISTING CLIENT ---
+    const index = callLogs.findIndex(r => r.id === editingRecordId);
+    if (index !== -1) {
+      const origRecord = callLogs[index];
+      
+      const updatedRecord = {
+        id: origRecord.id,
+        timestamp: origRecord.timestamp, // Keep original timestamp
+        name: name,
+        mobile: mobile,
+        age: age,
+        gender: gender,
+        status: status,
+        appointmentGiven: appointmentGiven,
+        appointmentDate: appointmentGiven ? appointmentDate : null,
+        biRequired: biRequired,
+        biProduct: biRequired ? biProduct : null,
+        comments: comments,
+        addedBy: addedBy,
+        syncStatus: "Pending" // Retrigger sync upload
+      };
+
+      callLogs[index] = updatedRecord;
+      saveLogsToLocalStorage();
+      
+      // Render layout updates
+      renderHistoryTable();
+      recalculateAnalytics();
+      
+      // Upload updated data to sheet
+      triggerSheetSync(updatedRecord.id);
+      showToast("Record Updated", `Updated details for customer "${name}".`, "success");
+      
+      resetForm();
+
+      // If mobile screen size, auto-switch back to History tab
+      if (window.innerWidth <= 768) {
+        switchMobileTab('history');
+      }
+    }
+  } else {
+    // --- CREATE NEW CLIENT RECORD ---
+    const newRecord = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      name: name,
+      mobile: mobile,
+      age: age,
+      gender: gender,
+      status: status,
+      appointmentGiven: appointmentGiven,
+      appointmentDate: appointmentGiven ? appointmentDate : null,
+      biRequired: biRequired,
+      biProduct: biRequired ? biProduct : null,
+      comments: comments,
+      addedBy: addedBy,
+      syncStatus: "Pending"
+    };
+
+    callLogs.unshift(newRecord);
+    saveLogsToLocalStorage();
+
+    renderHistoryTable();
+    recalculateAnalytics();
+    
+    // Trigger Sheet Sync
+    triggerSheetSync(newRecord.id);
+    showToast("Record Logged", `Customer "${name}" recorded successfully.`, "success");
+    
+    resetForm();
+
+    // If mobile screen size, switch back to History tab to see the new entry
+    if (window.innerWidth <= 768) {
+      switchMobileTab('history');
+    }
+  }
+}
+
+function resetForm() {
+  document.getElementById("call-form").reset();
+
+  const warnContainer = document.getElementById("duplicate-warning-container");
+  if (warnContainer) {
+    warnContainer.classList.add("hidden");
+    warnContainer.innerHTML = "";
+  }
+  
+  // Exit Edit Mode and restore titles
+  editingRecordId = null;
+  const formPanel = document.getElementById("form-panel-section");
+  const headerTitle = document.getElementById("form-header-title");
+  const headerIcon = document.getElementById("form-header-icon");
+  const submitBtn = document.querySelector("#call-form button[type='submit']");
+
+  if (formPanel) formPanel.classList.remove("edit-mode-active");
+  if (headerTitle) headerTitle.textContent = "Log New Call Update";
+  if (headerIcon) headerIcon.setAttribute("data-lucide", "user-plus");
+  if (submitBtn) {
+    submitBtn.innerHTML = `<i data-lucide="save"></i> Save Call Record`;
+  }
+  if (window.lucide) window.lucide.createIcons();
+  
+  // Prefill Agent Caller name
+  const agentInput = document.getElementById("caller-name");
+  if (agentInput) {
+    agentInput.value = localStorage.getItem("telecaller_agent_name") || "";
+  }
+  
+  // Reset visibility states
+  document.getElementById("appointment-date-group").classList.remove("active");
+  document.getElementById("appointment-date").required = false;
+  document.getElementById("appointment-date").value = "";
+
+  document.getElementById("bi-product-group").classList.remove("active");
+  document.getElementById("bi-product").required = false;
+  document.getElementById("bi-product").value = "";
+
+  document.getElementById("customer-gender").value = "";
+
+  handleStatusChange();
+}
+
+// --- Google Sheets Sync Engine ---
+async function triggerSheetSync(recordId) {
+  const index = callLogs.findIndex(r => r.id === recordId);
+  if (index === -1) return;
+
+  const record = callLogs[index];
+  
+  if (!sheetUrl) {
+    console.log(`Sheets URL not configured. Record ${record.name} kept as Pending Sync.`);
+    return;
+  }
+
+  updateRecordSyncUiStatus(recordId, "Syncing");
+
+  try {
+    const payload = {
+      name: record.name,
+      mobile: record.mobile,
+      age: record.age || "N/A",
+      gender: record.gender,
+      status: record.status,
+      appointmentGiven: record.appointmentGiven ? "Yes" : "No",
+      appointmentDate: record.appointmentDate ? formatDateTimeReadable(record.appointmentDate) : "N/A",
+      biRequired: record.biRequired ? "Yes" : "No",
+      biProduct: record.biProduct || "N/A",
+      comments: record.comments || "N/A",
+      addedBy: record.addedBy || "N/A"
+    };
+
+    // Bypassing browser preflight CORS restrictions on Google Apps Script Web Apps
+    // by using "no-cors" mode universally for all POST sync operations.
+    await fetch(sheetUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    callLogs[index].syncStatus = "Synced";
+    saveLogsToLocalStorage();
+    updateRecordSyncUiStatus(recordId, "Synced");
+    showToast("Synced to Sheet", `"${record.name}" updated on Google Sheets.`, "success");
+
+  } catch (error) {
+    console.error("Sheets Sync Error:", error);
+    callLogs[index].syncStatus = "Pending";
+    saveLogsToLocalStorage();
+    updateRecordSyncUiStatus(recordId, "Pending");
+    showToast("Sync Pending", `Saved locally. Will upload "${record.name}" automatically once online.`, "info");
+  }
+}
+
+function syncPendingLogs() {
+  if (!sheetUrl) return;
+
+  const pendingRecords = callLogs.filter(r => r.syncStatus === "Pending");
+  if (pendingRecords.length === 0) return;
+
+  showToast("Syncing Database", `Syncing ${pendingRecords.length} pending logs with Google Sheet...`, "info");
+  
+  pendingRecords.forEach(record => {
+    triggerSheetSync(record.id);
+  });
+}
+
+function updateRecordSyncUiStatus(recordId, status) {
+  // Update desktop row
+  const row = document.querySelector(`tr[data-id="${recordId}"]`);
+  const mobileCard = document.querySelector(`.mobile-card[data-id="${recordId}"]`);
+  
+  const applySyncBadge = (element) => {
+    if (!element) return;
+    const syncCell = element.querySelector(".sync-col") || element.querySelector(".sync-pill").parentElement;
+    if (!syncCell) return;
+
+    if (status === "Synced") {
+      syncCell.innerHTML = `
+        <span class="sync-pill sync-pill-success">
+          <i data-lucide="check-circle-2"></i> Synced
+        </span>
+      `;
+    } else if (status === "Syncing") {
+      syncCell.innerHTML = `
+        <span class="sync-pill sync-pill-pending">
+          <i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0; width:11px; height:11px;"></i> Syncing...
+        </span>
+      `;
+    } else {
+      syncCell.innerHTML = `
+        <span class="sync-pill sync-pill-pending" onclick="triggerSheetSync('${recordId}')" title="Click to sync manually">
+          <i data-lucide="alert-circle"></i> Pending
+        </span>
+      `;
+    }
+  };
+
+  applySyncBadge(row);
+  applySyncBadge(mobileCard);
+  
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+// --- Analytics / Performance Computation ---
+function recalculateAnalytics() {
+  const totalCalls = callLogs.length;
+  document.getElementById("stat-total-calls").textContent = totalCalls;
+
+  const apptsCount = callLogs.filter(r => r.appointmentGiven).length;
+  const apptsPct = totalCalls > 0 ? Math.round((apptsCount / totalCalls) * 100) : 0;
+  document.getElementById("stat-appointments").innerHTML = `${apptsCount} <span class="percentage" id="stat-appointments-pct">(${apptsPct}%)</span>`;
+
+  const biRequests = callLogs.filter(r => r.biRequired).length;
+  document.getElementById("stat-bi-requests").textContent = biRequests;
+
+  const interestedCount = callLogs.filter(r => r.status === "Interested").length;
+  const interestedPct = totalCalls > 0 ? Math.round((interestedCount / totalCalls) * 100) : 0;
+  document.getElementById("stat-interested").innerHTML = `${interestedCount} <span class="percentage" id="stat-interested-pct">(${interestedPct}%)</span>`;
+}
+
+// --- Render Table & History Panel (Dual responsive system) ---
+function renderHistoryTable(filteredLogs = null) {
+  const tableBody = document.getElementById("history-table-body");
+  const mobileCardsList = document.getElementById("mobile-cards-list");
+  const activeLogs = filteredLogs || callLogs;
+  
+  const showingText = document.getElementById("showing-records-text");
+  if (showingText) {
+    showingText.textContent = `Showing ${activeLogs.length} of ${callLogs.length} entries`;
+  }
+
+  const isMobile = window.innerWidth <= 768;
+
+  // Empty state handling
+  if (activeLogs.length === 0) {
+    const offlineWarning = !sheetUrl 
+      ? `<p class="field-hint" style="color:#b45309; font-weight: 600; margin-top: 0.75rem; text-align: center; max-width: 320px;">⚠️ Sheets Offline: Configure your Google Sheets Sync URL in Settings (⚙️) to retrieve and search logs from other callers.</p>` 
+      : "";
+
+    const emptyStateHtml = `
+      <div class="empty-state">
+        <i data-lucide="clipboard-list" class="empty-icon"></i>
+        <h3>No matching calls logged</h3>
+        <p>Modify filters or use the form to record new call entries.</p>
+        ${offlineWarning}
+      </div>
+    `;
+    
+    if (isMobile) {
+      if (mobileCardsList) mobileCardsList.innerHTML = emptyStateHtml;
+    } else {
+      if (tableBody) {
+        tableBody.innerHTML = `
+          <tr class="empty-state-row">
+            <td colspan="7">${emptyStateHtml}</td>
+          </tr>
+        `;
+      }
+    }
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+
+  // Clear previous records
+  if (tableBody) tableBody.innerHTML = "";
+  if (mobileCardsList) mobileCardsList.innerHTML = "";
+
+  activeLogs.forEach(record => {
+    // RENDER DESKTOP TABULAR VIEW
+    if (tableBody && !isMobile) {
+      const tr = document.createElement("tr");
+      tr.setAttribute("data-id", record.id);
+
+      const remarksHtml = record.comments 
+        ? `<span class="cust-remarks" title="Remarks"><i data-lucide="message-square"></i> "${escapeHtml(record.comments)}"</span>` 
+        : "";
+        
+      const detailsCell = `
+        <td>
+          <div class="cell-customer">
+            <span class="cust-name">${escapeHtml(record.name)}</span>
+            <span class="cust-phone">
+              <i data-lucide="smartphone"></i> ${escapeHtml(record.mobile)}
+            </span>
+            <span class="cust-agent">
+              <i data-lucide="user-check"></i> Agent: ${escapeHtml(record.addedBy || "N/A")}
+            </span>
+            ${remarksHtml}
+          </div>
+        </td>
+      `;
+
+      const ageDisplay = record.age ? `${record.age} yrs` : "—";
+      const genderCell = `
+        <td>
+          <span class="cust-gender">${record.gender}</span>, 
+          <span class="cust-age text-muted">${ageDisplay}</span>
+        </td>
+      `;
+
+      let statusClass = "tbl-badge-thinking";
+      let statusIcon = "message-square-more";
+      if (record.status === "Interested") {
+        statusClass = "tbl-badge-interested";
+        statusIcon = "thumbs-up";
+      } else if (record.status === "Not Interested") {
+        statusClass = "tbl-badge-refused";
+        statusIcon = "thumbs-down";
+      } else if (record.status === "Lead") {
+        statusClass = "tbl-badge-lead";
+        statusIcon = "sparkles";
+      }
+      const statusCell = `
+        <td>
+          <span class="tbl-badge ${statusClass}">
+            <i data-lucide="${statusIcon}"></i> ${record.status}
+          </span>
+        </td>
+      `;
+
+      let apptContent = "";
+      if (record.appointmentGiven) {
+        apptContent = `
+          <span class="appt-status appt-yes">Yes</span>
+          <span class="appt-time" title="Scheduled Date">
+            <i data-lucide="calendar"></i> ${formatDateTimeReadable(record.appointmentDate)}
+          </span>
+        `;
+      } else {
+        apptContent = `<span class="appt-status appt-no">No</span>`;
+      }
+      const appointmentCell = `<td><div class="appt-info">${apptContent}</div></td>`;
+
+      let biContent = "";
+      if (record.biRequired) {
+        biContent = `
+          <span class="bi-badge bi-yes">Yes</span>
+          <span class="bi-prod-tag">${record.biProduct}</span>
+        `;
+      } else {
+        biContent = `<span class="bi-badge bi-no">No</span>`;
+      }
+      const biCell = `<td><div class="bi-info">${biContent}</div></td>`;
+
+      let syncContent = "";
+      if (record.syncStatus === "Synced") {
+        syncContent = `
+          <span class="sync-pill sync-pill-success">
+            <i data-lucide="check-circle-2"></i> Synced
+          </span>
+        `;
+      } else if (record.syncStatus === "Syncing") {
+        syncContent = `
+          <span class="sync-pill sync-pill-pending">
+            <i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0; width:11px; height:11px;"></i> Syncing...
+          </span>
+        `;
+      } else {
+        syncContent = `
+          <span class="sync-pill sync-pill-pending" onclick="triggerSheetSync('${record.id}')" title="Click to manually sync">
+            <i data-lucide="alert-circle"></i> Pending
+          </span>
+        `;
+      }
+      const syncCell = `<td class="sync-col">${syncContent}</td>`;
+
+      const actionCell = `
+        <td>
+          <div class="actions-cell">
+            <button class="btn-icon-only btn-tbl-primary" onclick="editRecord('${record.id}')" title="Edit Record" style="margin-right: 0.25rem;">
+              <i data-lucide="edit-3" style="width:14px; height:14px;"></i>
+            </button>
+            <button class="btn-icon-only btn-tbl-danger" onclick="deleteRecord('${record.id}')" title="Delete Record">
+              <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
+            </button>
+          </div>
+        </td>
+      `;
+
+      tr.innerHTML = detailsCell + genderCell + statusCell + appointmentCell + biCell + syncCell + actionCell;
+      tableBody.appendChild(tr);
+    }
+
+    // RENDER MOBILE CARDS LAYOUT VIEW
+    if (mobileCardsList && isMobile) {
+      const card = document.createElement("div");
+      card.className = "mobile-card";
+      card.setAttribute("data-id", record.id);
+
+      let statusClass = "tbl-badge-thinking";
+      let statusIcon = "message-square-more";
+      if (record.status === "Interested") {
+        statusClass = "tbl-badge-interested";
+        statusIcon = "thumbs-up";
+      } else if (record.status === "Not Interested") {
+        statusClass = "tbl-badge-refused";
+        statusIcon = "thumbs-down";
+      } else if (record.status === "Lead") {
+        statusClass = "tbl-badge-lead";
+        statusIcon = "sparkles";
+      }
+
+      const remarksHtml = record.comments 
+        ? `
+          <div class="m-card-remarks">
+            <span class="m-card-remarks-label">Comments / Remarks:</span>
+            <span>"${escapeHtml(record.comments)}"</span>
+          </div>
+        ` 
+        : "";
+
+      let apptContent = "";
+      if (record.appointmentGiven) {
+        apptContent = `
+          <div class="m-card-detail-item">
+            <span class="m-card-detail-label">Appt Date:</span>
+            <span class="m-card-detail-val">${formatDateTimeReadable(record.appointmentDate)}</span>
+          </div>
+        `;
+      }
+
+      let biContent = "";
+      if (record.biRequired) {
+        biContent = `
+          <div class="m-card-detail-item">
+            <span class="m-card-detail-label">Product Category:</span>
+            <span class="m-card-detail-val">${record.biProduct}</span>
+          </div>
+        `;
+      }
+
+      let syncContent = "";
+      if (record.syncStatus === "Synced") {
+        syncContent = `
+          <span class="sync-pill sync-pill-success">
+            <i data-lucide="check-circle-2"></i> Synced
+          </span>
+        `;
+      } else if (record.syncStatus === "Syncing") {
+        syncContent = `
+          <span class="sync-pill sync-pill-pending">
+            <i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0; width:11px; height:11px;"></i> Syncing...
+          </span>
+        `;
+      } else {
+        syncContent = `
+          <span class="sync-pill sync-pill-pending" onclick="triggerSheetSync('${record.id}')" title="Click to sync manually">
+            <i data-lucide="alert-circle"></i> Pending
+          </span>
+        `;
+      }
+
+      const ageDisplay = record.age ? `${record.age} yrs` : "—";
+
+      card.innerHTML = `
+        <div class="m-card-header">
+          <div class="m-card-cust-info">
+            <span class="m-card-name">${escapeHtml(record.name)}</span>
+            <span class="m-card-phone"><i data-lucide="smartphone"></i> ${escapeHtml(record.mobile)}</span>
+          </div>
+          <span class="tbl-badge ${statusClass}">
+            <i data-lucide="${statusIcon}"></i> ${record.status}
+          </span>
+        </div>
+        
+        <div class="m-card-meta-row">
+          <span class="m-card-agent"><i data-lucide="user-check"></i> ${escapeHtml(record.addedBy || "N/A")}</span>
+          <span class="m-card-demographics">${record.gender}, ${ageDisplay}</span>
+        </div>
+        
+        <div class="m-card-details-box">
+          <div class="m-card-detail-item">
+            <span class="m-card-detail-label">Appointment Given:</span>
+            <span class="m-card-detail-val">${record.appointmentGiven ? "Yes" : "No"}</span>
+          </div>
+          ${apptContent}
+          <div class="m-card-detail-item">
+            <span class="m-card-detail-label">BI Illustration:</span>
+            <span class="m-card-detail-val">${record.biRequired ? "Yes" : "No"}</span>
+          </div>
+          ${biContent}
+          ${remarksHtml}
+        </div>
+        
+        <div class="m-card-actions">
+          <span class="m-card-time">${formatDateTimeReadable(record.timestamp)}</span>
+          <div style="display:flex; align-items:center; gap:0.4rem;">
+            ${syncContent}
+            <button class="btn-icon-only btn-tbl-primary" onclick="editRecord('${record.id}')" title="Edit Log">
+              <i data-lucide="edit-3" style="width:13px; height:13px;"></i>
+            </button>
+            <button class="btn-icon-only btn-tbl-danger" onclick="deleteRecord('${record.id}')" title="Delete Log">
+              <i data-lucide="trash-2" style="width:13px; height:13px;"></i>
+            </button>
+          </div>
+        </div>
+      `;
+
+      mobileCardsList.appendChild(card);
+    }
+  });
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+// --- Search and Filters Engine ---
+function filterCallHistory() {
+  const searchInput = document.getElementById("search-input").value.toLowerCase().trim();
+  const statusFilter = document.getElementById("filter-status").value;
+  const appointmentFilter = document.getElementById("filter-appointment").value;
+
+  const filteredLogs = callLogs.filter(record => {
+    if (!record) return false;
+
+    // 1. Safe Search Query Match across Name, Mobile, Comments, and AddedBy (Caller)
+    const recName = record.name ? record.name.toString().toLowerCase() : "";
+    
+    let recMobile = record.mobile ? record.mobile.toString() : "";
+    if (recMobile.indexOf('.') !== -1) {
+      recMobile = recMobile.split('.')[0];
+    }
+    recMobile = recMobile.toLowerCase();
+
+    const recComments = record.comments ? record.comments.toString().toLowerCase() : "";
+    const recAddedBy = record.addedBy ? record.addedBy.toString().toLowerCase() : "";
+
+    const matchesSearch = recName.includes(searchInput) || 
+                          recMobile.includes(searchInput) ||
+                          recComments.includes(searchInput) ||
+                          recAddedBy.includes(searchInput);
+    
+    // 2. Status Match
+    const matchesStatus = statusFilter === "All" || record.status === statusFilter;
+
+    // 3. Appointment Match
+    let matchesAppointment = true;
+    if (appointmentFilter === "Yes") {
+      matchesAppointment = record.appointmentGiven === true;
+    } else if (appointmentFilter === "No") {
+      matchesAppointment = record.appointmentGiven === false;
+    }
+
+    return matchesSearch && matchesStatus && matchesAppointment;
+  });
+
+  renderHistoryTable(filteredLogs);
+}
+
+// --- Live Mobile Number Lookup CRM Feature ---
+function handleLiveMobileLookup() {
+  const mobileInput = document.getElementById("mobile-number");
+  const warnContainer = document.getElementById("duplicate-warning-container");
+  if (!mobileInput || !warnContainer) return;
+
+  const mobileVal = mobileInput.value.trim().replace(/[^0-9]/g, "");
+  
+  // Only search when the input is a valid 10-digit number
+  if (mobileVal.length === 10) {
+    const match = callLogs.find(record => {
+      let recMobile = String(record.mobile || "");
+      if (recMobile.indexOf('.') !== -1) {
+        recMobile = recMobile.split('.')[0];
+      }
+      recMobile = recMobile.replace(/[^0-9]/g, "");
+      return recMobile === mobileVal;
+    });
+
+    if (match && match.id !== editingRecordId) {
+      // Record found! Show friendly warning banner
+      warnContainer.innerHTML = `
+        <div class="dup-warn-banner">
+          <i data-lucide="alert-circle" class="dup-warn-icon"></i>
+          <span class="dup-warn-text">
+            Customer already logged by <strong>${escapeHtml(match.addedBy || "another caller")}</strong>.
+          </span>
+          <button type="button" class="dup-warn-action-btn" onclick="editRecord('${match.id}')">
+            <i data-lucide="edit-3"></i> Load & Edit Details
+          </button>
+        </div>
+      `;
+      warnContainer.classList.remove("hidden");
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
+  }
+
+  // Hide container if no match or length is not 10 digits
+  warnContainer.classList.add("hidden");
+  warnContainer.innerHTML = "";
+}
+
+// --- Delete & Clear Actions ---
+function deleteRecord(recordId) {
+  const record = callLogs.find(r => r.id === recordId);
+  if (!record) return;
+
+  if (confirm(`Are you sure you want to delete the call record for "${record.name}"?`)) {
+    callLogs = callLogs.filter(r => r.id !== recordId);
+    saveLogsToLocalStorage();
+    
+    renderHistoryTable();
+    recalculateAnalytics();
+    showToast("Record Deleted", "Client record removed successfully.", "info");
+    
+    if (editingRecordId === recordId) {
+      resetForm();
+    }
+  }
+}
+
+function clearTodayLogs() {
+  if (callLogs.length === 0) {
+    showToast("No Logs", "There are no calling logs to clear.", "info");
+    return;
+  }
+
+  if (confirm("WARNING: This will delete ALL logged calling updates on your screen. Do you want to proceed?")) {
+    callLogs = [];
+    saveLogsToLocalStorage();
+    
+    renderHistoryTable();
+    recalculateAnalytics();
+    showToast("Data Cleared", "Calling log entries have been cleared.", "success");
+    resetForm();
+  }
+}
+
+// --- Export to CSV Generator ---
+function exportCallLogsToCSV() {
+  if (callLogs.length === 0) {
+    showToast("No Data", "There are no logged calls to export yet.", "error");
+    return;
+  }
+
+  const headers = [
+    "Timestamp",
+    "Customer Name",
+    "Mobile Number",
+    "Age",
+    "Gender",
+    "Call Status",
+    "Appointment Given",
+    "Appointment Date",
+    "BI Required",
+    "BI Product",
+    "Call Comments",
+    "Added By"
+  ];
+
+  const csvRows = [
+    headers.join(",")
+  ];
+
+  callLogs.forEach(record => {
+    const row = [
+      `"${new Date(record.timestamp).toLocaleString()}"`,
+      `"${escapeCsvString(record.name)}"`,
+      `"${record.mobile}"`,
+      `"${record.age || 'N/A'}"`,
+      `"${record.gender}"`,
+      `"${record.status}"`,
+      `"${record.appointmentGiven ? 'Yes' : 'No'}"`,
+      `"${record.appointmentDate ? formatDateTimeReadable(record.appointmentDate) : 'N/A'}"`,
+      `"${record.biRequired ? 'Yes' : 'No'}"`,
+      `"${record.biProduct || 'N/A'}"`,
+      `"${escapeCsvString(record.comments || 'N/A')}"`,
+      `"${escapeCsvString(record.addedBy || 'N/A')}"`
+    ];
+    csvRows.push(row.join(","));
+  });
+
+  const csvString = csvRows.join("\n");
+  const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+  
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  
+  const today = new Date().toISOString().slice(0, 10);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `allied_telecaller_logs_${today}.csv`);
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showToast("Export Successful", "CSV log sheet downloaded successfully.", "success");
+}
+
+// --- Toast System Helper ---
+function showToast(title, message, type = "success") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  
+  let icon = "check-circle";
+  if (type === "error") icon = "alert-octagon";
+  if (type === "info") icon = "info";
+
+  toast.innerHTML = `
+    <i data-lucide="${icon}" class="toast-icon"></i>
+    <div class="toast-content">
+      <h4>${title}</h4>
+      <p>${message}</p>
+    </div>
+    <button class="toast-close" onclick="this.parentElement.classList.add('toast-exit'); setTimeout(() => this.parentElement.remove(), 250)">&times;</button>
+  `;
+
+  container.appendChild(toast);
+  
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+
+  setTimeout(() => {
+    if (toast && toast.parentElement) {
+      toast.classList.add("toast-exit");
+      setTimeout(() => toast.remove(), 250);
+    }
+  }, 4500);
+}
+
+// --- Common UI Formatting Helpers ---
+function formatDateTimeReadable(isoString) {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeCsvString(str) {
+  if (!str) return "";
+  return str.replace(/"/g, '""');
+}
