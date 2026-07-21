@@ -1079,6 +1079,8 @@ function filterCallHistory() {
   const searchInput = document.getElementById("search-input").value.toLowerCase().trim();
   const statusFilter = document.getElementById("filter-status").value;
   const appointmentFilter = document.getElementById("filter-appointment").value;
+  const dateFilterInput = document.getElementById("filter-date");
+  const dateFilter = dateFilterInput ? dateFilterInput.value : "";
 
   const filteredLogs = callLogs.filter(record => {
     if (!record) return false;
@@ -1111,10 +1113,28 @@ function filterCallHistory() {
       matchesAppointment = record.appointmentGiven === false;
     }
 
-    return matchesSearch && matchesStatus && matchesAppointment;
+    // 4. Date Match (Filters by Call Log Timestamp or Scheduled Appointment Date)
+    let matchesDate = true;
+    if (dateFilter) {
+      const recDate = getLocalDateISO(record.timestamp);
+      const apptDate = getLocalDateISO(record.appointmentDate);
+      matchesDate = (recDate === dateFilter) || (apptDate === dateFilter);
+    }
+
+    return matchesSearch && matchesStatus && matchesAppointment && matchesDate;
   });
 
   renderHistoryTable(filteredLogs);
+}
+
+function getLocalDateISO(dateInput) {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // --- Live Mobile Number Lookup CRM Feature ---

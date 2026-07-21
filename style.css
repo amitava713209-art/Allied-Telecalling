@@ -840,21 +840,23 @@ button {
   position: relative;
 }
 
-.filter-group select {
+.filter-group select,
+.date-filter-input {
   font-family: var(--font-body);
   font-size: 0.85rem;
   font-weight: 500;
   color: #475569;
   background-color: #f1f5f9;
   border: 1px solid var(--border-color);
-  padding: 0.55rem 1rem;
+  padding: 0.55rem 0.75rem;
   border-radius: var(--radius-md);
   outline: none;
   cursor: pointer;
   transition: var(--transition-smooth);
 }
 
-.filter-group select:focus {
+.filter-group select:focus,
+.date-filter-input:focus {
   border-color: var(--primary);
   background-color: #ffffff;
 }

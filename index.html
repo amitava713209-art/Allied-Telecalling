@@ -316,6 +316,10 @@
           </div>
 
           <div class="filter-group">
+            <div class="date-filter-wrapper">
+              <input type="date" id="filter-date" class="date-filter-input" onchange="filterCallHistory()" title="Filter by Date">
+            </div>
+
             <div class="select-wrapper">
               <select id="filter-status" onchange="filterCallHistory()">
                 <option value="All">All Statuses</option>
