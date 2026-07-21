@@ -1969,4 +1969,368 @@ button {
   height: 11px;
 }
 
+/* ==========================================================================
+   ADVANCED FEATURES: CLICK-TO-CALL, WHATSAPP DIRECT, LEAD QUEUE & RECORDER
+   ========================================================================== */
+
+/* Mobile Input Wrapper with Quick Actions */
+.mobile-input-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.mobile-input-wrapper input {
+  padding-right: 175px !important;
+}
+
+.quick-dial-actions {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  z-index: 5;
+}
+
+.btn-dial-call,
+.btn-dial-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 0.38rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-dial-call {
+  background-color: #059669;
+  color: #ffffff;
+}
+
+.btn-dial-call:hover {
+  background-color: #047857;
+  transform: translateY(-1px);
+}
+
+.btn-dial-wa {
+  background-color: #25d366;
+  color: #ffffff;
+}
+
+.btn-dial-wa:hover {
+  background-color: #128c7e;
+  transform: translateY(-1px);
+}
+
+.btn-dial-call i, .btn-dial-call svg,
+.btn-dial-wa i, .btn-dial-wa svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Table Actions Call & WhatsApp buttons */
+.btn-tbl-call {
+  background-color: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.btn-tbl-call:hover {
+  background-color: #059669;
+  color: #ffffff;
+}
+
+.btn-tbl-wa {
+  background-color: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.btn-tbl-wa:hover {
+  background-color: #25d366;
+  color: #ffffff;
+}
+
+/* Voice Call Audio Recorder Widget */
+.voice-recorder-box {
+  background-color: #f8fafc;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.voice-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-recorder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-rec-start {
+  background-color: #4f46e5;
+  color: #ffffff;
+}
+
+.btn-rec-start:hover {
+  background-color: #4338ca;
+}
+
+.btn-rec-recording {
+  background-color: #e11d48;
+  color: #ffffff;
+  animation: pulse-red 1.2s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(225, 29, 72, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+}
+
+.rec-timer-badge {
+  font-family: monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e11d48;
+  background-color: #ffe4e6;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.audio-preview-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.audio-preview-container audio {
+  flex: 1;
+  height: 36px;
+}
+
+/* Excel Lead Import & Calling Queue Card */
+.lead-queue-panel {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.lead-queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.queue-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.queue-title h3 {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.queue-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background-color: var(--primary-light);
+  color: var(--primary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+}
+
+.queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-upload-excel {
+  cursor: pointer;
+  margin: 0;
+}
+
+.lead-queue-container {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.empty-queue-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background-color: #f8fafc;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.queue-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.65rem;
+}
+
+.queue-card {
+  background-color: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
+  transition: var(--transition-smooth);
+}
+
+.queue-card:hover {
+  border-color: var(--primary);
+  background-color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.queue-card.card-dimmed {
+  opacity: 0.6;
+  background-color: #f1f5f9;
+}
+
+.q-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.q-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.q-name {
+  font-weight: 600;
+  font-size: 0.83rem;
+  color: var(--text-main);
+}
+
+.q-mobile {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.q-mobile i, .q-mobile svg {
+  width: 11px;
+  height: 11px;
+}
+
+.queue-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.queue-status-pending {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+.queue-status-called {
+  background-color: #d1fae5;
+  color: #047857;
+}
+
+.q-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-q-action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.3rem 0.35rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-q-load {
+  background-color: #e0e7ff;
+  color: #4338ca;
+}
+
+.btn-q-load:hover {
+  background-color: #4338ca;
+  color: #ffffff;
+}
+
+.btn-q-call {
+  background-color: #d1fae5;
+  color: #047857;
+}
+
+.btn-q-call:hover {
+  background-color: #059669;
+  color: #ffffff;
+}
+
+.btn-q-wa {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.btn-q-wa:hover {
+  background-color: #25d366;
+  color: #ffffff;
+}
+
+.btn-q-action i, .btn-q-action svg {
+  width: 11px;
+  height: 11px;
+}
+
 

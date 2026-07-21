@@ -10,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- SheetJS CDN for Excel/CSV Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -124,14 +126,22 @@
             </div>
           </div>
 
-          <!-- Mobile Number -->
+          <!-- Mobile Number & Quick Actions -->
           <div class="form-group">
             <label for="mobile-number">
               Mobile Number <span class="required">*</span>
             </label>
-            <div class="input-wrapper">
+            <div class="input-wrapper mobile-input-wrapper">
               <i data-lucide="smartphone" class="input-icon"></i>
               <input type="tel" id="mobile-number" placeholder="10-digit mobile number" required pattern="[0-9]{10}" title="Please enter a valid 10-digit mobile number" autocomplete="off">
+              <div class="quick-dial-actions">
+                <button type="button" class="btn-dial-call" onclick="triggerClickToCall()" title="Call Native SIM Dialer">
+                  <i data-lucide="phone-call"></i> Call
+                </button>
+                <button type="button" class="btn-dial-wa" onclick="triggerWhatsAppChat()" title="Open Direct WhatsApp Chat">
+                  <i data-lucide="message-circle"></i> WhatsApp
+                </button>
+              </div>
             </div>
             <span class="field-hint">Format: 10 digits without spaces or country code</span>
             <div id="duplicate-warning-container" class="duplicate-warning hidden"></div>
@@ -267,6 +277,27 @@
             </div>
           </div>
 
+          <!-- Voice Call Audio Recorder Widget (HTML5 MediaRecorder) -->
+          <div class="form-group voice-recorder-group">
+            <label>
+              Voice Note / Call Recording <span class="optional">(Optional)</span>
+            </label>
+            <div class="voice-recorder-box">
+              <div class="voice-controls">
+                <button type="button" id="btn-record-start" class="btn-recorder btn-rec-start" onclick="toggleAudioRecording()">
+                  <i data-lucide="mic"></i> <span id="rec-btn-text">Record Voice Note</span>
+                </button>
+                <span id="rec-timer" class="rec-timer-badge hidden">00:00</span>
+              </div>
+              <div id="audio-preview-container" class="audio-preview-container hidden">
+                <audio id="audio-player" controls></audio>
+                <button type="button" class="btn-icon-only btn-tbl-danger" onclick="deleteAudioRecording()" title="Delete Recording">
+                  <i data-lucide="trash-2"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Form Buttons -->
           <div class="form-actions">
             <button type="button" class="btn-secondary" onclick="resetForm()">
@@ -281,9 +312,35 @@
         </form>
       </section>
 
-      <!-- Right Column: Call History Table & Utilities -->
+      <!-- Right Column: Call History Table & Lead Import Queue -->
       <section class="table-panel animate-slide-left" id="table-panel-section">
-        <div class="panel-header-row">
+        <!-- Excel Lead Import & Calling Queue Card -->
+        <div class="lead-queue-panel">
+          <div class="lead-queue-header">
+            <div class="queue-title">
+              <i data-lucide="file-spreadsheet" class="indigo-text"></i>
+              <h3>Import Leads & Call Queue</h3>
+              <span id="queue-badge-count" class="queue-badge">0 Loaded</span>
+            </div>
+            <div class="queue-actions">
+              <label for="excel-file-input" class="btn-soft btn-upload-excel">
+                <i data-lucide="upload-cloud"></i> Upload Excel / CSV
+              </label>
+              <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)" style="display:none;">
+              <button type="button" class="btn-soft" onclick="clearLeadQueue()" title="Clear Queue List">
+                <i data-lucide="trash-2"></i> Clear Queue
+              </button>
+            </div>
+          </div>
+          <div id="lead-queue-container" class="lead-queue-container">
+            <div class="empty-queue-hint">
+              <i data-lucide="upload" style="width:22px; height:22px; color:#94a3b8;"></i>
+              <span>Upload an Excel/CSV lead file to auto-populate numbers into your calling queue. Click any lead to load it directly into the form!</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-header-row" style="margin-top: 1.25rem;">
           <div class="panel-header">
             <i data-lucide="list-checks"></i>
             <h2>Team Calling History</h2>

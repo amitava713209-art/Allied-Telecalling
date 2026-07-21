@@ -6,6 +6,12 @@
 
 // --- Global Application State ---
 let callLogs = [];
+let leadQueue = [];
+let mediaRecorder = null;
+let audioChunks = [];
+let recordedAudioBase64 = null;
+let recordingTimerInterval = null;
+let recordingSeconds = 0;
 
 // 💡 UNIVERSAL TEAM CONFIGURATION
 // Paste your deployed Google Apps Script Web App URL (ending in "/exec") inside the quotes below.
@@ -26,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // 3. Render initial views
   renderHistoryTable();
+  renderLeadQueue();
   recalculateAnalytics();
   updateSyncBadge();
 
@@ -87,6 +94,12 @@ function loadStoredData() {
       callLogs = JSON.parse(storedLogs);
     } else {
       callLogs = [];
+    }
+    const storedQueue = localStorage.getItem("telecaller_lead_queue");
+    if (storedQueue) {
+      leadQueue = JSON.parse(storedQueue);
+    } else {
+      leadQueue = [];
     }
     sheetUrl = DEFAULT_SHEET_URL || localStorage.getItem("telecaller_sheet_url") || "";
   } catch (error) {
@@ -561,12 +574,21 @@ function handleFormSubmit(event) {
         biProduct: biRequired ? biProduct : null,
         comments: comments,
         addedBy: addedBy,
+        audioRecording: recordedAudioBase64 || origRecord.audioRecording || null,
         syncStatus: "Pending" // Retrigger sync upload
       };
 
       callLogs[index] = updatedRecord;
       saveLogsToLocalStorage();
       
+      // Auto-mark lead queue item as called
+      const qItem = leadQueue.find(l => l.mobile === mobile);
+      if (qItem) {
+        qItem.status = "Called";
+        saveLeadQueueToLocalStorage();
+        renderLeadQueue();
+      }
+
       // Render layout updates
       renderHistoryTable();
       recalculateAnalytics();
@@ -598,11 +620,20 @@ function handleFormSubmit(event) {
       biProduct: biRequired ? biProduct : null,
       comments: comments,
       addedBy: addedBy,
+      audioRecording: recordedAudioBase64 || null,
       syncStatus: "Pending"
     };
 
     callLogs.unshift(newRecord);
     saveLogsToLocalStorage();
+
+    // Auto-mark lead queue item as called
+    const qItem = leadQueue.find(l => l.mobile === mobile);
+    if (qItem) {
+      qItem.status = "Called";
+      saveLeadQueueToLocalStorage();
+      renderLeadQueue();
+    }
 
     renderHistoryTable();
     recalculateAnalytics();
@@ -622,6 +653,7 @@ function handleFormSubmit(event) {
 
 function resetForm() {
   document.getElementById("call-form").reset();
+  deleteAudioRecording();
 
   const warnContainer = document.getElementById("duplicate-warning-container");
   if (warnContainer) {
@@ -690,7 +722,8 @@ async function triggerSheetSync(recordId) {
       biRequired: record.biRequired ? "Yes" : "No",
       biProduct: record.biProduct || "N/A",
       comments: record.comments || "N/A",
-      addedBy: record.addedBy || "N/A"
+      addedBy: record.addedBy || "N/A",
+      audioRecording: record.audioRecording || "N/A"
     };
 
     // Bypassing browser preflight CORS restrictions on Google Apps Script Web Apps
@@ -936,7 +969,13 @@ function renderHistoryTable(filteredLogs = null) {
       const actionCell = `
         <td>
           <div class="actions-cell">
-            <button class="btn-icon-only btn-tbl-primary" onclick="editRecord('${record.id}')" title="Edit Record" style="margin-right: 0.25rem;">
+            <button class="btn-icon-only btn-tbl-call" onclick="triggerClickToCall('${record.mobile}')" title="Call Native SIM Dialer">
+              <i data-lucide="phone-call" style="width:14px; height:14px;"></i>
+            </button>
+            <button class="btn-icon-only btn-tbl-wa" onclick="triggerWhatsAppChat('${record.mobile}', '${escapeHtml(record.name)}')" title="Open WhatsApp Chat">
+              <i data-lucide="message-circle" style="width:14px; height:14px;"></i>
+            </button>
+            <button class="btn-icon-only btn-tbl-primary" onclick="editRecord('${record.id}')" title="Edit Record">
               <i data-lucide="edit-3" style="width:14px; height:14px;"></i>
             </button>
             <button class="btn-icon-only btn-tbl-danger" onclick="deleteRecord('${record.id}')" title="Delete Record">
@@ -1055,6 +1094,12 @@ function renderHistoryTable(filteredLogs = null) {
           <span class="m-card-time">${formatDateTimeReadable(record.timestamp)}</span>
           <div style="display:flex; align-items:center; gap:0.4rem;">
             ${syncContent}
+            <button class="btn-icon-only btn-tbl-call" onclick="triggerClickToCall('${record.mobile}')" title="Call SIM">
+              <i data-lucide="phone-call" style="width:13px; height:13px;"></i>
+            </button>
+            <button class="btn-icon-only btn-tbl-wa" onclick="triggerWhatsAppChat('${record.mobile}', '${escapeHtml(record.name)}')" title="WhatsApp">
+              <i data-lucide="message-circle" style="width:13px; height:13px;"></i>
+            </button>
             <button class="btn-icon-only btn-tbl-primary" onclick="editRecord('${record.id}')" title="Edit Log">
               <i data-lucide="edit-3" style="width:13px; height:13px;"></i>
             </button>
@@ -1339,4 +1384,290 @@ function escapeHtml(str) {
 function escapeCsvString(str) {
   if (!str) return "";
   return str.replace(/"/g, '""');
+}
+
+// --- 📞 Click-to-Call & 💬 WhatsApp Direct Launcher ---
+function triggerClickToCall(targetMobile = null) {
+  const mob = targetMobile || document.getElementById("mobile-number").value.trim();
+  const cleanMobile = mob.replace(/[^0-9]/g, "");
+  if (!cleanMobile || cleanMobile.length < 10) {
+    showToast("Invalid Mobile", "Please enter or select a valid 10-digit mobile number to call.", "error");
+    return;
+  }
+  // Trigger native SIM phone dialer
+  window.location.href = `tel:${cleanMobile}`;
+  showToast("Calling...", `Initiating native SIM phone dialer for ${cleanMobile}.`, "info");
+}
+
+function triggerWhatsAppChat(targetMobile = null, targetName = "") {
+  const mob = targetMobile || document.getElementById("mobile-number").value.trim();
+  const name = targetName || (document.getElementById("customer-name") ? document.getElementById("customer-name").value.trim() : "");
+  let cleanMobile = mob.replace(/[^0-9]/g, "");
+  if (!cleanMobile || cleanMobile.length < 10) {
+    showToast("Invalid Mobile", "Please enter or select a valid 10-digit mobile number for WhatsApp.", "error");
+    return;
+  }
+  if (cleanMobile.length === 10) {
+    cleanMobile = "91" + cleanMobile;
+  }
+  
+  const greeting = name ? `Hello ${name}, ` : "Hello, ";
+  const defaultMsg = encodeURIComponent(`${greeting}following up from Allied Services regarding your query.`);
+  
+  const waUrl = `https://wa.me/${cleanMobile}?text=${defaultMsg}`;
+  window.open(waUrl, '_blank');
+  showToast("WhatsApp Direct", `Opening WhatsApp chat with +${cleanMobile}.`, "success");
+}
+
+// --- 📊 Excel/CSV Lead Upload & Calling Queue Engine ---
+function handleExcelUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      if (!rawRows || rawRows.length === 0) {
+        showToast("Empty File", "The uploaded Excel file contains no readable rows.", "error");
+        return;
+      }
+
+      let parsedCount = 0;
+      const newQueue = [];
+
+      rawRows.forEach((row, index) => {
+        const findVal = (keys) => {
+          for (let k of keys) {
+            const matchKey = Object.keys(row).find(rk => rk.toLowerCase().trim() === k.toLowerCase());
+            if (matchKey && row[matchKey]) return String(row[matchKey]).trim();
+          }
+          return "";
+        };
+
+        const name = findVal(["Customer Name", "Name", "Client Name", "Full Name", "Client"]);
+        const mobileRaw = findVal(["Mobile Number", "Mobile", "Phone", "Phone Number", "Contact"]);
+        const age = findVal(["Age", "Customer Age"]);
+        const gender = findVal(["Gender", "Sex"]);
+        const city = findVal(["City", "Location", "Notes", "Remarks"]);
+
+        let mobile = mobileRaw.replace(/[^0-9]/g, "");
+        if (mobile.length > 10 && mobile.startsWith("91")) {
+          mobile = mobile.slice(2);
+        }
+
+        if (mobile.length === 10) {
+          newQueue.push({
+            id: `lead_${Date.now()}_${index}`,
+            name: name || `Client ${parsedCount + 1}`,
+            mobile: mobile,
+            age: age || "",
+            gender: gender || "",
+            city: city || "",
+            status: "Pending"
+          });
+          parsedCount++;
+        }
+      });
+
+      if (parsedCount === 0) {
+        showToast("No Valid Numbers", "Could not find valid 10-digit mobile numbers in the file. Ensure headers are Name and Mobile.", "error");
+        return;
+      }
+
+      leadQueue = [...leadQueue, ...newQueue];
+      saveLeadQueueToLocalStorage();
+      renderLeadQueue();
+      showToast("Excel Imported", `Loaded ${parsedCount} leads into your Calling Queue!`, "success");
+
+    } catch (err) {
+      console.error("Excel parse error:", err);
+      showToast("Import Failed", "Failed to parse Excel file. Please upload a valid .xlsx or .csv file.", "error");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+function saveLeadQueueToLocalStorage() {
+  localStorage.setItem("telecaller_lead_queue", JSON.stringify(leadQueue));
+}
+
+function clearLeadQueue() {
+  if (leadQueue.length === 0) return;
+  if (confirm("Are you sure you want to clear all imported leads from the queue?")) {
+    leadQueue = [];
+    saveLeadQueueToLocalStorage();
+    renderLeadQueue();
+    showToast("Queue Cleared", "Imported leads queue cleared.", "info");
+  }
+}
+
+function renderLeadQueue() {
+  const container = document.getElementById("lead-queue-container");
+  const badge = document.getElementById("queue-badge-count");
+  if (!container) return;
+
+  if (badge) {
+    const pendingCount = leadQueue.filter(l => l.status === "Pending").length;
+    badge.textContent = `${pendingCount} / ${leadQueue.length} Pending`;
+  }
+
+  if (leadQueue.length === 0) {
+    container.innerHTML = `
+      <div class="empty-queue-hint">
+        <i data-lucide="upload" style="width:22px; height:22px; color:#94a3b8;"></i>
+        <span>Upload an Excel/CSV lead file to auto-populate numbers into your calling queue. Click any lead to load it directly into the form!</span>
+      </div>
+    `;
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+
+  let html = `<div class="queue-list-grid">`;
+  leadQueue.forEach(lead => {
+    const isCalled = lead.status === "Called";
+    const statusBadgeClass = isCalled ? "queue-status-called" : "queue-status-pending";
+    const statusText = isCalled ? "Called" : "Pending";
+
+    html += `
+      <div class="queue-card ${isCalled ? 'card-dimmed' : ''}" data-queue-id="${lead.id}">
+        <div class="q-card-header" onclick="loadLeadToForm('${lead.id}')">
+          <div class="q-info">
+            <span class="q-name">${escapeHtml(lead.name)}</span>
+            <span class="q-mobile"><i data-lucide="smartphone"></i> ${lead.mobile}</span>
+          </div>
+          <span class="queue-status-badge ${statusBadgeClass}">${statusText}</span>
+        </div>
+        <div class="q-actions">
+          <button type="button" class="btn-q-action btn-q-load" onclick="loadLeadToForm('${lead.id}')" title="Load Lead to Form">
+            <i data-lucide="arrow-left-circle"></i> Load
+          </button>
+          <button type="button" class="btn-q-action btn-q-call" onclick="triggerClickToCall('${lead.mobile}'); markLeadStatus('${lead.id}', 'Called');" title="Call Number">
+            <i data-lucide="phone-call"></i> Call
+          </button>
+          <button type="button" class="btn-q-action btn-q-wa" onclick="triggerWhatsAppChat('${lead.mobile}', '${escapeHtml(lead.name)}')" title="WhatsApp Message">
+            <i data-lucide="message-circle"></i> WhatsApp
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+
+  container.innerHTML = html;
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function loadLeadToForm(leadId) {
+  const lead = leadQueue.find(l => l.id === leadId);
+  if (!lead) return;
+
+  document.getElementById("customer-name").value = lead.name;
+  document.getElementById("mobile-number").value = lead.mobile;
+  if (lead.age) document.getElementById("customer-age").value = lead.age;
+  if (lead.gender && (lead.gender === "Male" || lead.gender === "Female")) {
+    document.getElementById("customer-gender").value = lead.gender;
+  }
+
+  showToast("Lead Loaded", `Loaded "${lead.name}" into Call Log Form.`, "info");
+
+  const formPanel = document.getElementById("form-panel-section");
+  if (formPanel) formPanel.scrollIntoView({ behavior: "smooth" });
+
+  if (window.innerWidth <= 768) {
+    switchMobileTab('form');
+  }
+}
+
+function markLeadStatus(leadId, newStatus) {
+  const index = leadQueue.findIndex(l => l.id === leadId);
+  if (index !== -1) {
+    leadQueue[index].status = newStatus;
+    saveLeadQueueToLocalStorage();
+    renderLeadQueue();
+  }
+}
+
+// --- 🎙️ Voice Call Audio Recorder Engine (MediaRecorder API) ---
+async function toggleAudioRecording() {
+  const recBtn = document.getElementById("btn-record-start");
+  const recBtnText = document.getElementById("rec-btn-text");
+  const recTimer = document.getElementById("rec-timer");
+  const previewContainer = document.getElementById("audio-preview-container");
+
+  if (!mediaRecorder || mediaRecorder.state === "inactive") {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.ondataavailable = event => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          recordedAudioBase64 = reader.result;
+          const player = document.getElementById("audio-player");
+          if (player) {
+            player.src = URL.createObjectURL(audioBlob);
+          }
+          if (previewContainer) previewContainer.classList.remove("hidden");
+        };
+        reader.readAsDataURL(audioBlob);
+
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      
+      if (recBtn) recBtn.className = "btn-recorder btn-rec-recording";
+      if (recBtnText) recBtnText.textContent = "Stop Recording";
+      if (recTimer) recTimer.classList.remove("hidden");
+
+      recordingSeconds = 0;
+      if (recTimer) recTimer.textContent = "00:00";
+      recordingTimerInterval = setInterval(() => {
+        recordingSeconds++;
+        const mins = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+        const secs = String(recordingSeconds % 60).padStart(2, '0');
+        if (recTimer) recTimer.textContent = `${mins}:${secs}`;
+      }, 1000);
+
+      showToast("Recording Started", "Microphone recording active...", "info");
+
+    } catch (err) {
+      console.error("Microphone access error:", err);
+      showToast("Mic Access Error", "Could not access microphone for call recording.", "error");
+    }
+  } else if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    clearInterval(recordingTimerInterval);
+
+    if (recBtn) recBtn.className = "btn-recorder btn-rec-start";
+    if (recBtnText) recBtnText.textContent = "Record Voice Note";
+    if (recTimer) recTimer.classList.add("hidden");
+
+    showToast("Recording Stopped", "Voice note captured successfully!", "success");
+  }
+}
+
+function deleteAudioRecording() {
+  recordedAudioBase64 = null;
+  const player = document.getElementById("audio-player");
+  const previewContainer = document.getElementById("audio-preview-container");
+  if (player) player.src = "";
+  if (previewContainer) previewContainer.classList.add("hidden");
 }

@@ -43,9 +43,10 @@ function doPost(e) {
         "BI Required",
         "BI Product Category",
         "Call Comments",
-        "Added By"
+        "Added By",
+        "Audio Note"
       ]);
-      sheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
+      sheet.getRange(1, 1, 1, 13).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
     }
     
     var data;
@@ -80,6 +81,7 @@ function doPost(e) {
     var biProduct = data.biProduct || "N/A";
     var comments = data.comments || "N/A";
     var addedBy = data.addedBy || "N/A";
+    var audioRecording = data.audioRecording || "N/A";
     
     // --- DYNAMIC HEADER MAPPING ENGINE ---
     var range = sheet.getDataRange();
@@ -107,6 +109,7 @@ function doPost(e) {
     var colBiProd = getColIdx(["BI Product Category", "BI Product", "Product"], 9);
     var colComments = getColIdx(["Call Comments", "Comments", "Remarks", "Remarks / Comments", "Notes"], 10);
     var colAddedBy = getColIdx(["Added By", "Agent", "Caller", "User", "Addedby"], 11);
+    var colAudio = getColIdx(["Audio Note", "Audio Recording", "Recording", "Audio", "Voice Note"], 12);
 
     // Build dynamically ordered values array to preserve columns even if user rearranged them
     var rowValues = [];
@@ -126,6 +129,11 @@ function doPost(e) {
     rowValues[colBiProd] = biProduct;
     rowValues[colComments] = comments;
     rowValues[colAddedBy] = addedBy;
+    if (colAudio < rowValues.length) {
+      rowValues[colAudio] = audioRecording;
+    } else {
+      rowValues.push(audioRecording);
+    }
 
     // --- SMART OVERWRITE ENGINE (Edit In-place) ---
     var rowIndex = -1;
