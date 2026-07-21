@@ -101,6 +101,7 @@ function loadStoredData() {
     } else {
       leadQueue = [];
     }
+    // Prioritize DEFAULT_SHEET_URL so callers never have to configure anything manually
     sheetUrl = DEFAULT_SHEET_URL || localStorage.getItem("telecaller_sheet_url") || "";
   } catch (error) {
     console.error("Error loading local storage data:", error);
@@ -374,7 +375,7 @@ function openSettings() {
   const modal = document.getElementById("settings-modal");
   const urlInput = document.getElementById("web-app-url");
   
-  urlInput.value = localStorage.getItem("telecaller_sheet_url") || DEFAULT_SHEET_URL;
+  urlInput.value = DEFAULT_SHEET_URL || localStorage.getItem("telecaller_sheet_url") || "";
   modal.style.display = "flex";
   
   const testStatus = document.getElementById("test-conn-status");
