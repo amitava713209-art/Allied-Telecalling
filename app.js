@@ -27,8 +27,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1. Load data from LocalStorage
   loadStoredData();
   
-  // 2. Display current date nicely
+  // 2. Display current date nicely and set default date filter to today
   displayCurrentDate();
+  const dateInput = document.getElementById("filter-date");
+  if (dateInput) {
+    dateInput.value = getLocalDateISO(new Date());
+  }
   
   // 3. Render initial views
   renderHistoryTable();
@@ -298,7 +302,7 @@ async function fetchRemoteLogs() {
       // Merge remote spreadsheet data with local logs
       mergeLogs(data.records);
       saveLogsToLocalStorage();
-      renderHistoryTable();
+      filterCallHistory();
       recalculateAnalytics();
       
       // Also fetch shared central Lead Queue tab
