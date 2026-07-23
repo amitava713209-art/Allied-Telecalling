@@ -1457,9 +1457,15 @@ function handleExcelUpload(event) {
         const gender = findVal(["Gender", "Sex"]);
         const city = findVal(["City", "Location", "Notes", "Remarks"]);
 
+        // Safe cleanup for phone numbers (extract first sequence of 10 consecutive digits if possible, or fall back to trailing 10 digits)
         let mobile = mobileRaw.replace(/[^0-9]/g, "");
-        if (mobile.length > 10 && mobile.startsWith("91")) {
+        
+        // Handle numbers starting with country code 91
+        if (mobile.length === 12 && mobile.startsWith("91")) {
           mobile = mobile.slice(2);
+        } else if (mobile.length > 10) {
+          // If it's longer than 10 digits, grab the last 10 digits
+          mobile = mobile.slice(-10);
         }
 
         if (mobile.length === 10) {
