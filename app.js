@@ -332,33 +332,20 @@ async function fetchRemoteLogs() {
 function mergeLogs(remoteRecords) {
   const mergedMap = new Map();
 
-  const getCleanMobile = (mobileVal) => {
-    let mob = String(mobileVal || "");
-    if (mob.indexOf('.') !== -1) {
-      mob = mob.split('.')[0];
-    }
-    return mob.replace(/[^0-9]/g, "");
-  };
-
   // 1. Process remote records (Sheet is source of truth)
   remoteRecords.forEach(record => {
-    const cleanMobile = getCleanMobile(record.mobile);
-    if (cleanMobile) {
-      mergedMap.set(cleanMobile, record);
-    }
+    const key = record.id || (record.mobile ? `mob_${record.mobile}` : `rec_${Math.random()}`);
+    mergedMap.set(key, record);
   });
 
   // 2. Add local records that aren't synced or aren't in the sheet yet
   callLogs.forEach(record => {
-    const cleanMobile = getCleanMobile(record.mobile);
-    if (cleanMobile) {
-      if (!mergedMap.has(cleanMobile)) {
-        mergedMap.set(cleanMobile, record);
-      } else {
-        // If a local record matches but has pending status updates, prioritize local version
-        if (record.syncStatus === "Pending") {
-          mergedMap.set(cleanMobile, record);
-        }
+    const key = record.id || (record.mobile ? `mob_${record.mobile}` : `rec_${Math.random()}`);
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, record);
+    } else {
+      if (record.syncStatus === "Pending") {
+        mergedMap.set(key, record);
       }
     }
   });
