@@ -91,13 +91,15 @@ function loadStoredData() {
   try {
     const storedLogs = localStorage.getItem("telecaller_logs");
     if (storedLogs) {
-      callLogs = JSON.parse(storedLogs);
+      const parsed = JSON.parse(storedLogs);
+      callLogs = Array.isArray(parsed) ? parsed : [];
     } else {
       callLogs = [];
     }
     const storedQueue = localStorage.getItem("telecaller_lead_queue");
     if (storedQueue) {
-      leadQueue = JSON.parse(storedQueue);
+      const parsedQ = JSON.parse(storedQueue);
+      leadQueue = Array.isArray(parsedQ) ? parsedQ : [];
     } else {
       leadQueue = [];
     }
