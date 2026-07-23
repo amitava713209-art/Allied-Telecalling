@@ -312,10 +312,8 @@ async function fetchRemoteLogs() {
       throw new Error(data.message || "Invalid data format received.");
     }
   } catch (error) {
-    console.warn("Direct CORS fetch failed (likely local file:// protocol or browser security restriction), triggering script payload fallback:", error);
-    
-    // JSONP / Script Injection Fallback for local files & CORS restricted browsers
-    return new Promise((resolve) => {
+    console.warn("Direct CORS fetch failed, falling back to script injection:", error);
+    try {
       const callbackName = "handleSheetDataFallback_" + Date.now();
       window[callbackName] = function(data) {
         if (data && data.records) {
@@ -325,30 +323,22 @@ async function fetchRemoteLogs() {
           recalculateAnalytics();
           fetchCentralLeadQueue();
           updateSyncBadge();
-          showToast("Sync Successful", `Fetched ${data.records.length} team logs from Google Sheet.`, "success");
         }
         delete window[callbackName];
-        if (scriptTag && scriptTag.parentNode) scriptTag.parentNode.removeChild(scriptTag);
-        resolve();
       };
-
       const scriptTag = document.createElement("script");
-      const jsonpUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName;
-      scriptTag.src = jsonpUrl;
-      scriptTag.onerror = function() {
-        console.warn("JSONP fallback also failed.");
-        delete window[callbackName];
-        if (scriptTag && scriptTag.parentNode) scriptTag.parentNode.removeChild(scriptTag);
-        resolve();
-      };
+      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName;
       document.body.appendChild(scriptTag);
-    });
-
+    } catch (e) {
+      console.warn("Fallback failed:", e);
+    }
   } finally {
     if (refreshIcon) refreshIcon.classList.remove("spin-icon");
     if (refreshBtn) refreshBtn.disabled = false;
   }
 }
+
+window.fetchRemoteLogs = fetchRemoteLogs;
 
 // De-duplicate team records retrieved from Sheet
 function mergeLogs(remoteRecords) {
