@@ -1634,15 +1634,9 @@ button {
     margin-bottom: 2rem;
   }
 
-  /* Form and Table panel display states */
   .form-panel, .table-panel {
-    display: block;
+    display: block !important;
     padding: 1.25rem 1rem;
-  }
-
-  .form-panel.mobile-hidden,
-  .table-panel.mobile-hidden {
-    display: none !important;
   }
   
   .panel-header-row {
