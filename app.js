@@ -1443,35 +1443,68 @@ function handleExcelUpload(event) {
       const newQueue = [];
 
       rawRows.forEach((row, index) => {
-        const findVal = (keys) => {
-          for (let k of keys) {
-            const matchKey = Object.keys(row).find(rk => rk.toLowerCase().trim() === k.toLowerCase());
-            if (matchKey && row[matchKey]) return String(row[matchKey]).trim();
+        const rowKeys = Object.keys(row);
+        let name = "";
+        let mobileRaw = "";
+        let age = "";
+        let gender = "";
+        let city = "";
+
+        // 1. Try finding explicit header matches first
+        for (let k of rowKeys) {
+          const cleanK = k.toLowerCase().trim();
+          const val = String(row[k]).trim();
+          if (!val) continue;
+
+          if (["customer name", "name", "client name", "full name", "client", "customer", "lead name", "lead"].includes(cleanK)) {
+            if (!name) name = val;
+          } else if (["mobile number", "mobile", "phone", "phone number", "contact", "contact number", "cell", "telephone", "mobile no", "phone no", "mob", "number"].includes(cleanK)) {
+            if (!mobileRaw) mobileRaw = val;
+          } else if (["age", "customer age"].includes(cleanK)) {
+            if (!age) age = val;
+          } else if (["gender", "sex"].includes(cleanK)) {
+            if (!gender) gender = val;
+          } else if (["city", "location", "address", "notes", "remarks"].includes(cleanK)) {
+            if (!city) city = val;
           }
-          return "";
-        };
+        }
 
-        const name = findVal(["Customer Name", "Name", "Client Name", "Full Name", "Client"]);
-        const mobileRaw = findVal(["Mobile Number", "Mobile", "Phone", "Phone Number", "Contact"]);
-        const age = findVal(["Age", "Customer Age"]);
-        const gender = findVal(["Gender", "Sex"]);
-        const city = findVal(["City", "Location", "Notes", "Remarks"]);
+        // 2. Ultra-smart fallback: If header name wasn't recognized, scan ALL cell values in this row for phone numbers!
+        if (!mobileRaw) {
+          for (let k of rowKeys) {
+            const valStr = String(row[k]).trim();
+            const cleanedVal = valStr.replace(/[^0-9]/g, "");
+            // If cell contains 10 to 13 digits, treat it as the mobile number!
+            if (cleanedVal.length >= 10 && cleanedVal.length <= 13) {
+              mobileRaw = valStr;
+              break;
+            }
+          }
+        }
 
-        // Safe cleanup for phone numbers (extract first sequence of 10 consecutive digits if possible, or fall back to trailing 10 digits)
+        // 3. Fallback for Name: If name wasn't recognized, pick the first non-numeric text cell that isn't the phone number
+        if (!name) {
+          for (let k of rowKeys) {
+            const valStr = String(row[k]).trim();
+            if (valStr && valStr !== mobileRaw && isNaN(valStr) && valStr.length > 1) {
+              name = valStr;
+              break;
+            }
+          }
+        }
+
+        // Clean extracted mobile number
         let mobile = mobileRaw.replace(/[^0-9]/g, "");
-        
-        // Handle numbers starting with country code 91
         if (mobile.length === 12 && mobile.startsWith("91")) {
           mobile = mobile.slice(2);
         } else if (mobile.length > 10) {
-          // If it's longer than 10 digits, grab the last 10 digits
           mobile = mobile.slice(-10);
         }
 
         if (mobile.length === 10) {
           newQueue.push({
             id: `lead_${Date.now()}_${index}`,
-            name: name || `Client ${parsedCount + 1}`,
+            name: name || `Lead ${parsedCount + 1}`,
             mobile: mobile,
             age: age || "",
             gender: gender || "",
