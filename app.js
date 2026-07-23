@@ -1398,9 +1398,13 @@ function triggerClickToCall(targetMobile = null) {
     showToast("Invalid Mobile", "Please enter or select a valid 10-digit mobile number to call.", "error");
     return;
   }
-  // Trigger native SIM phone dialer
+
+  // 1. Auto-start recording before launching native SIM dialer
+  startAutoCallRecording();
+
+  // 2. Trigger native SIM phone dialer
   window.location.href = `tel:${cleanMobile}`;
-  showToast("Calling...", `Initiating native SIM phone dialer for ${cleanMobile}.`, "info");
+  showToast("Calling & Recording", `Initiating call for ${cleanMobile}. Recording started automatically!`, "info");
 }
 
 function triggerWhatsAppChat(targetMobile = null, targetName = "") {
@@ -1696,70 +1700,103 @@ function markLeadStatus(leadId, newStatus) {
 }
 
 // --- 🎙️ Voice Call Audio Recorder Engine (MediaRecorder API) ---
-async function toggleAudioRecording() {
+async function startAutoCallRecording() {
   const recBtn = document.getElementById("btn-record-start");
   const recBtnText = document.getElementById("rec-btn-text");
   const recTimer = document.getElementById("rec-timer");
   const previewContainer = document.getElementById("audio-preview-container");
 
-  if (!mediaRecorder || mediaRecorder.state === "inactive") {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunks = [];
-      mediaRecorder = new MediaRecorder(stream);
-
-      mediaRecorder.ondataavailable = event => {
-        if (event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          recordedAudioBase64 = reader.result;
-          const player = document.getElementById("audio-player");
-          if (player) {
-            player.src = URL.createObjectURL(audioBlob);
-          }
-          if (previewContainer) previewContainer.classList.remove("hidden");
-        };
-        reader.readAsDataURL(audioBlob);
-
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-      
-      if (recBtn) recBtn.className = "btn-recorder btn-rec-recording";
-      if (recBtnText) recBtnText.textContent = "Stop Recording";
-      if (recTimer) recTimer.classList.remove("hidden");
-
-      recordingSeconds = 0;
-      if (recTimer) recTimer.textContent = "00:00";
-      recordingTimerInterval = setInterval(() => {
-        recordingSeconds++;
-        const mins = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
-        const secs = String(recordingSeconds % 60).padStart(2, '0');
-        if (recTimer) recTimer.textContent = `${mins}:${secs}`;
-      }, 1000);
-
-      showToast("Recording Started", "Microphone recording active...", "info");
-
-    } catch (err) {
-      console.error("Microphone access error:", err);
-      showToast("Mic Access Error", "Could not access microphone for call recording.", "error");
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    
+    // Choose compatible MIME type for browser/mobile audio capture
+    let options = {};
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      options = { mimeType: 'audio/webm;codecs=opus' };
+    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+      options = { mimeType: 'audio/mp4' };
     }
-  } else if (mediaRecorder && mediaRecorder.state === "recording") {
+
+    mediaRecorder = new MediaRecorder(stream, options);
+
+    mediaRecorder.ondataavailable = event => {
+      if (event.data && event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const mimeType = mediaRecorder.mimeType || 'audio/webm';
+      const audioBlob = new Blob(audioChunks, { type: mimeType });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        recordedAudioBase64 = reader.result;
+        const player = document.getElementById("audio-player");
+        if (player) {
+          player.src = URL.createObjectURL(audioBlob);
+        }
+        if (previewContainer) previewContainer.classList.remove("hidden");
+      };
+      reader.readAsDataURL(audioBlob);
+
+      stream.getTracks().forEach(track => track.stop());
+    };
+
+    mediaRecorder.start(500); // Capture data chunks every 500ms
+    
+    if (recBtn) recBtn.className = "btn-recorder btn-rec-recording";
+    if (recBtnText) recBtnText.textContent = "Recording Call...";
+    if (recTimer) recTimer.classList.remove("hidden");
+
+    recordingSeconds = 0;
+    if (recTimer) recTimer.textContent = "00:00";
+    if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+    recordingTimerInterval = setInterval(() => {
+      recordingSeconds++;
+      const mins = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+      const secs = String(recordingSeconds % 60).padStart(2, '0');
+      if (recTimer) recTimer.textContent = `${mins}:${secs}`;
+    }, 1000);
+
+    // Auto-stop recording when caller returns to app window after ending call
+    window.addEventListener("focus", handleWindowFocusAutoStop, { once: true });
+
+  } catch (err) {
+    console.error("Microphone access error:", err);
+    showToast("Mic Access Required", "Please allow microphone permissions in browser settings for call recording.", "error");
+  }
+}
+
+function handleWindowFocusAutoStop() {
+  // Give 1.5 seconds grace period after phone dialer returns focus to wrap up recording
+  setTimeout(() => {
+    stopAutoCallRecording();
+  }, 1500);
+}
+
+function stopAutoCallRecording() {
+  const recBtn = document.getElementById("btn-record-start");
+  const recBtnText = document.getElementById("rec-btn-text");
+  const recTimer = document.getElementById("rec-timer");
+
+  if (mediaRecorder && mediaRecorder.state === "recording") {
     mediaRecorder.stop();
-    clearInterval(recordingTimerInterval);
+    if (recordingTimerInterval) clearInterval(recordingTimerInterval);
 
     if (recBtn) recBtn.className = "btn-recorder btn-rec-start";
     if (recBtnText) recBtnText.textContent = "Record Voice Note";
     if (recTimer) recTimer.classList.add("hidden");
 
-    showToast("Recording Stopped", "Voice note captured successfully!", "success");
+    showToast("Call Ended & Saved", "Call audio recorded and attached to form preview!", "success");
+  }
+}
+
+async function toggleAudioRecording() {
+  if (!mediaRecorder || mediaRecorder.state === "inactive") {
+    await startAutoCallRecording();
+  } else if (mediaRecorder && mediaRecorder.state === "recording") {
+    stopAutoCallRecording();
   }
 }
 
