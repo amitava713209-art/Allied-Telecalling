@@ -372,9 +372,9 @@
             <input type="text" id="search-input" placeholder="Search by name or mobile..." oninput="filterCallHistory()">
           </div>
 
-          <div class="filter-group">
-            <div class="date-filter-wrapper">
+            <div class="date-filter-wrapper" style="display:flex; align-items:center; gap:0.25rem;">
               <input type="date" id="filter-date" class="date-filter-input" onchange="filterCallHistory()" title="Filter by Date">
+              <button type="button" class="btn-secondary" style="padding:0.4rem 0.6rem; font-size:0.75rem;" onclick="clearDateFilter()" title="Show All Dates">All Dates</button>
             </div>
 
             <div class="select-wrapper">

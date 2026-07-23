@@ -1178,6 +1178,14 @@ function filterCallHistory() {
   renderHistoryTable(filteredLogs);
 }
 
+function clearDateFilter() {
+  const dateInput = document.getElementById("filter-date");
+  if (dateInput) {
+    dateInput.value = "";
+    filterCallHistory();
+  }
+}
+
 function getLocalDateISO(dateInput) {
   if (!dateInput) return "";
   const d = new Date(dateInput);
