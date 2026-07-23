@@ -1129,13 +1129,14 @@ function renderHistoryTable(filteredLogs = null) {
   }
 }
 
-// --- Search and Filters Engine ---
 function filterCallHistory() {
   const searchInput = document.getElementById("search-input").value.toLowerCase().trim();
   const statusFilter = document.getElementById("filter-status").value;
   const appointmentFilter = document.getElementById("filter-appointment").value;
   const dateFilterInput = document.getElementById("filter-date");
-  const dateFilter = dateFilterInput ? dateFilterInput.value : "";
+  
+  // Clean up any default date lock
+  let dateFilter = dateFilterInput ? dateFilterInput.value : "";
 
   const filteredLogs = callLogs.filter(record => {
     if (!record) return false;
