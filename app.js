@@ -284,9 +284,24 @@ async function fetchRemoteLogs() {
   if (refreshBtn) refreshBtn.disabled = true;
 
   try {
+    const callbackName = "handleSheetDataFallback_Global";
+    window[callbackName] = function(data) {
+      if (data && data.records) {
+        mergeLogs(data.records);
+        saveLogsToLocalStorage();
+        filterCallHistory();
+        recalculateAnalytics();
+        fetchCentralLeadQueue();
+        updateSyncBadge();
+      }
+    };
+
     // If opening locally as file://, use script tag injection directly to bypass browser CORS blocks
     if (window.location.protocol === "file:") {
-      throw new Error("File protocol detected, use script injection");
+      const scriptTag = document.createElement("script");
+      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName;
+      document.body.appendChild(scriptTag);
+      return;
     }
 
     // Fetch query with fetch action parameter
@@ -321,20 +336,8 @@ async function fetchRemoteLogs() {
   } catch (error) {
     console.warn("Direct CORS fetch failed, falling back to script injection:", error);
     try {
-      const callbackName = "handleSheetDataFallback_" + Date.now();
-      window[callbackName] = function(data) {
-        if (data && data.records) {
-          mergeLogs(data.records);
-          saveLogsToLocalStorage();
-          filterCallHistory();
-          recalculateAnalytics();
-          fetchCentralLeadQueue();
-          updateSyncBadge();
-        }
-        delete window[callbackName];
-      };
       const scriptTag = document.createElement("script");
-      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName;
+      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=handleSheetDataFallback_Global";
       document.body.appendChild(scriptTag);
     } catch (e) {
       console.warn("Fallback failed:", e);
