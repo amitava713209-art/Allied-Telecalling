@@ -935,18 +935,14 @@ function renderHistoryTable(filteredLogs = null) {
       } else {
         apptContent = `<span class="appt-status appt-no">No</span>`;
       }
-      const appointmentCell = `<td><div class="appt-info">${apptContent}</div></td>`;
-
-      let biContent = "";
-      if (record.biRequired) {
-        biContent = `
-          <span class="bi-badge bi-yes">Yes</span>
-          <span class="bi-prod-tag">${record.biProduct}</span>
+      let audioCell = "<td><span class='text-muted' style='font-size:0.75rem;'>No recording</span></td>";
+      if (record.audioRecording && record.audioRecording.length > 50) {
+        audioCell = `
+          <td>
+            <audio controls style="height:30px; width:130px;" src="${record.audioRecording}"></audio>
+          </td>
         `;
-      } else {
-        biContent = `<span class="bi-badge bi-no">No</span>`;
       }
-      const biCell = `<td><div class="bi-info">${biContent}</div></td>`;
 
       let syncContent = "";
       if (record.syncStatus === "Synced") {
@@ -989,7 +985,7 @@ function renderHistoryTable(filteredLogs = null) {
         </td>
       `;
 
-      tr.innerHTML = detailsCell + genderCell + statusCell + appointmentCell + biCell + syncCell + actionCell;
+      tr.innerHTML = detailsCell + genderCell + statusCell + appointmentCell + audioCell + syncCell + actionCell;
       tableBody.appendChild(tr);
     }
 
@@ -1064,6 +1060,16 @@ function renderHistoryTable(filteredLogs = null) {
 
       const ageDisplay = record.age ? `${record.age} yrs` : "—";
 
+      let audioPlayerHtml = "";
+      if (record.audioRecording && record.audioRecording.length > 50) {
+        audioPlayerHtml = `
+          <div class="m-card-detail-item" style="flex-direction:column; align-items:flex-start; margin-top:0.4rem;">
+            <span class="m-card-detail-label">Call Audio Recording:</span>
+            <audio controls style="height:32px; width:100%; margin-top:0.25rem;" src="${record.audioRecording}"></audio>
+          </div>
+        `;
+      }
+
       card.innerHTML = `
         <div class="m-card-header">
           <div class="m-card-cust-info">
@@ -1086,11 +1092,7 @@ function renderHistoryTable(filteredLogs = null) {
             <span class="m-card-detail-val">${record.appointmentGiven ? "Yes" : "No"}</span>
           </div>
           ${apptContent}
-          <div class="m-card-detail-item">
-            <span class="m-card-detail-label">BI Illustration:</span>
-            <span class="m-card-detail-val">${record.biRequired ? "Yes" : "No"}</span>
-          </div>
-          ${biContent}
+          ${audioPlayerHtml}
           ${remarksHtml}
         </div>
         
