@@ -379,18 +379,32 @@ function doGet(e) {
         }
       }
       
-      return ContentService.createTextOutput(JSON.stringify({
+      var resObj = {
         status: "success",
         records: dataList
-      }))
+      };
+
+      if (e && e.parameter && e.parameter.callback) {
+        return ContentService.createTextOutput(e.parameter.callback + "(" + JSON.stringify(resObj) + ")")
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+
+      return ContentService.createTextOutput(JSON.stringify(resObj))
       .setMimeType(ContentService.MimeType.JSON);
     }
     
     // Connection test default response
-    return ContentService.createTextOutput(JSON.stringify({
+    var connObj = {
       status: "connected",
       message: "Web App URL is configured correctly and online!"
-    }))
+    };
+
+    if (e && e.parameter && e.parameter.callback) {
+      return ContentService.createTextOutput(e.parameter.callback + "(" + JSON.stringify(connObj) + ")")
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(connObj))
     .setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {

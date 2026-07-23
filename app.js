@@ -312,16 +312,38 @@ async function fetchRemoteLogs() {
       throw new Error(data.message || "Invalid data format received.");
     }
   } catch (error) {
-    console.warn("Could not retrieve remote logs directly due to CORS or network, keeping connected state:", error);
+    console.warn("Direct CORS fetch failed (likely local file:// protocol or browser security restriction), triggering script payload fallback:", error);
     
-    // Maintain connected state for callers if DEFAULT_SHEET_URL is present
-    const syncBtn = document.getElementById("sync-status-btn");
-    const syncText = document.getElementById("sync-status-text");
-    if (syncBtn && syncText && sheetUrl) {
-      syncBtn.className = "status-badge state-connected";
-      syncText.textContent = "Sheets Connected";
-      syncBtn.removeAttribute("style");
-    }
+    // JSONP / Script Injection Fallback for local files & CORS restricted browsers
+    return new Promise((resolve) => {
+      const callbackName = "handleSheetDataFallback_" + Date.now();
+      window[callbackName] = function(data) {
+        if (data && data.records) {
+          mergeLogs(data.records);
+          saveLogsToLocalStorage();
+          filterCallHistory();
+          recalculateAnalytics();
+          fetchCentralLeadQueue();
+          updateSyncBadge();
+          showToast("Sync Successful", `Fetched ${data.records.length} team logs from Google Sheet.`, "success");
+        }
+        delete window[callbackName];
+        if (scriptTag && scriptTag.parentNode) scriptTag.parentNode.removeChild(scriptTag);
+        resolve();
+      };
+
+      const scriptTag = document.createElement("script");
+      const jsonpUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName;
+      scriptTag.src = jsonpUrl;
+      scriptTag.onerror = function() {
+        console.warn("JSONP fallback also failed.");
+        delete window[callbackName];
+        if (scriptTag && scriptTag.parentNode) scriptTag.parentNode.removeChild(scriptTag);
+        resolve();
+      };
+      document.body.appendChild(scriptTag);
+    });
+
   } finally {
     if (refreshIcon) refreshIcon.classList.remove("spin-icon");
     if (refreshBtn) refreshBtn.disabled = false;
