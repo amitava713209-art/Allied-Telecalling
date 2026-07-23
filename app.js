@@ -300,6 +300,14 @@ async function fetchRemoteLogs() {
     if (window.location.protocol === "file:") {
       const scriptTag = document.createElement("script");
       scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName;
+      scriptTag.onload = function() {
+        if (refreshIcon) refreshIcon.classList.remove("spin-icon");
+        if (refreshBtn) refreshBtn.disabled = false;
+      };
+      scriptTag.onerror = function() {
+        if (refreshIcon) refreshIcon.classList.remove("spin-icon");
+        if (refreshBtn) refreshBtn.disabled = false;
+      };
       document.body.appendChild(scriptTag);
       return;
     }
