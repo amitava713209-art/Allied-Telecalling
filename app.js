@@ -355,14 +355,14 @@ function mergeLogs(remoteRecords) {
   const mergedMap = new Map();
 
   // 1. Process remote records (Sheet is source of truth)
-  remoteRecords.forEach(record => {
-    const key = record.id || (record.mobile ? `mob_${record.mobile}` : `rec_${Math.random()}`);
+  remoteRecords.forEach((record, idx) => {
+    const key = record.id || (record.mobile ? `mob_${record.mobile}` : `rec_${idx}`);
     mergedMap.set(key, record);
   });
 
   // 2. Add local records that aren't synced or aren't in the sheet yet
-  callLogs.forEach(record => {
-    const key = record.id || (record.mobile ? `mob_${record.mobile}` : `rec_${Math.random()}`);
+  callLogs.forEach((record, idx) => {
+    const key = record.id || (record.mobile ? `mob_${record.mobile}` : `local_${idx}`);
     if (!mergedMap.has(key)) {
       mergedMap.set(key, record);
     } else {
@@ -372,9 +372,11 @@ function mergeLogs(remoteRecords) {
     }
   });
 
-  // 3. Convert back and sort descending by timestamp
+  // 3. Convert back and sort descending by timestamp (or array order)
   callLogs = Array.from(mergedMap.values()).sort((a, b) => {
-    return new Date(b.timestamp) - new Date(a.timestamp);
+    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return (timeB || 0) - (timeA || 0);
   });
 }
 
