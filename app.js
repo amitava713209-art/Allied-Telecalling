@@ -282,6 +282,11 @@ async function fetchRemoteLogs() {
   if (refreshBtn) refreshBtn.disabled = true;
 
   try {
+    // If opening locally as file://, use script tag injection directly to bypass browser CORS blocks
+    if (window.location.protocol === "file:") {
+      throw new Error("File protocol detected, use script injection");
+    }
+
     // Fetch query with fetch action parameter
     const fetchUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch";
     const response = await fetch(fetchUrl, {
