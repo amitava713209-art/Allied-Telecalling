@@ -994,7 +994,7 @@ function renderHistoryTable(filteredLogs = null) {
     }
 
     // RENDER MOBILE CARDS LAYOUT VIEW
-    if (mobileCardsList && isMobile) {
+    if (mobileCardsList) {
       const card = document.createElement("div");
       card.className = "mobile-card";
       card.setAttribute("data-id", record.id);
