@@ -301,6 +301,9 @@ async function fetchRemoteLogs() {
       renderHistoryTable();
       recalculateAnalytics();
       
+      // Also fetch shared central Lead Queue tab
+      fetchCentralLeadQueue();
+
       // Update Sync Badge to show success state
       updateSyncBadge();
       
@@ -1523,7 +1526,11 @@ function handleExcelUpload(event) {
       leadQueue = [...leadQueue, ...newQueue];
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
-      showToast("Excel Imported", `Loaded ${parsedCount} leads into your Calling Queue!`, "success");
+      
+      // Upload new leads to central Google Sheets Lead Queue tab
+      syncCentralLeadQueue(newQueue);
+
+      showToast("Excel Imported", `Loaded ${parsedCount} leads into Central Calling Queue!`, "success");
 
     } catch (err) {
       console.error("Excel parse error:", err);
@@ -1534,6 +1541,58 @@ function handleExcelUpload(event) {
   };
 
   reader.readAsArrayBuffer(file);
+}
+
+async function syncCentralLeadQueue(newLeads) {
+  if (!sheetUrl) return;
+  try {
+    await fetch(sheetUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "upload_queue",
+        leads: newLeads
+      })
+    });
+    console.log("Central lead queue uploaded to Google Sheets.");
+  } catch (err) {
+    console.warn("Could not sync central lead queue:", err);
+  }
+}
+
+async function fetchCentralLeadQueue() {
+  if (!sheetUrl) return;
+  try {
+    const fetchUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue";
+    const response = await fetch(fetchUrl, { method: "GET", mode: "cors" });
+    if (response.ok) {
+      const data = await response.json();
+      if (data.status === "success" && data.queue) {
+        mergeLeadQueue(data.queue);
+        saveLeadQueueToLocalStorage();
+        renderLeadQueue();
+      }
+    }
+  } catch (err) {
+    console.warn("Could not fetch remote lead queue:", err);
+  }
+}
+
+function mergeLeadQueue(remoteQueue) {
+  const map = new Map();
+  leadQueue.forEach(item => map.set(item.mobile, item));
+  remoteQueue.forEach(item => {
+    if (!map.has(item.mobile)) {
+      map.set(item.mobile, item);
+    } else {
+      // If remote status is called, reflect called status
+      if (item.status === "Called") {
+        map.get(item.mobile).status = "Called";
+      }
+    }
+  });
+  leadQueue = Array.from(map.values());
 }
 
 function saveLeadQueueToLocalStorage() {

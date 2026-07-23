@@ -26,6 +26,62 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
     }
     
+    var data;
+    if (e.postData && e.postData.contents) {
+      try {
+        data = JSON.parse(e.postData.contents);
+      } catch (jsonError) {
+        data = e.parameter;
+      }
+    } else {
+      data = e.parameter;
+    }
+
+    // --- CENTRAL LEAD QUEUE IMPORT HANDLER ---
+    if (data && data.action === "upload_queue" && data.leads) {
+      var queueSheet = ss.getSheetByName("Lead Queue");
+      if (!queueSheet) {
+        queueSheet = ss.insertSheet("Lead Queue");
+      }
+      if (queueSheet.getLastRow() === 0) {
+        queueSheet.appendRow(["ID", "Name", "Mobile Number", "Age", "Gender", "City", "Status"]);
+        queueSheet.getRange(1, 1, 1, 7).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
+      }
+      
+      var existingData = queueSheet.getDataRange().getValues();
+      var existingMobiles = {};
+      for (var q = 1; q < existingData.length; q++) {
+        var m = existingData[q][2] ? existingData[q][2].toString().replace(/[^0-9]/g, "") : "";
+        if (m) existingMobiles[m] = true;
+      }
+      
+      var newRows = [];
+      data.leads.forEach(function(lead) {
+        var mobClean = lead.mobile ? lead.mobile.toString().replace(/[^0-9]/g, "") : "";
+        if (mobClean && !existingMobiles[mobClean]) {
+          newRows.push([
+            lead.id || ("lead_" + new Date().getTime() + "_" + Math.floor(Math.random()*1000)),
+            lead.name || "Lead",
+            "'" + mobClean,
+            lead.age || "",
+            lead.gender || "",
+            lead.city || "",
+            lead.status || "Pending"
+          ]);
+          existingMobiles[mobClean] = true;
+        }
+      });
+      
+      if (newRows.length > 0) {
+        queueSheet.getRange(queueSheet.getLastRow() + 1, 1, newRows.length, 7).setValues(newRows);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Successfully uploaded " + newRows.length + " new leads to central Lead Queue tab!"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
     // Automatically find the sheet tab that contains the telecaller logs (Self-Healing)
     var sheet = findLogsSheet(ss);
     
@@ -47,17 +103,6 @@ function doPost(e) {
         "Audio Note"
       ]);
       sheet.getRange(1, 1, 1, 13).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
-    }
-    
-    var data;
-    if (e.postData && e.postData.contents) {
-      try {
-        data = JSON.parse(e.postData.contents);
-      } catch (jsonError) {
-        data = e.parameter;
-      }
-    } else {
-      data = e.parameter;
     }
     
     // Connection test handler
@@ -156,6 +201,19 @@ function doPost(e) {
       }
     }
     
+    // Also mark lead queue item as called in central tab if present
+    var queueSheetRef = ss.getSheetByName("Lead Queue");
+    if (queueSheetRef && searchMobile) {
+      var qData = queueSheetRef.getDataRange().getValues();
+      for (var qIdx = 1; qIdx < qData.length; qIdx++) {
+        var qMob = qData[qIdx][2] ? qData[qIdx][2].toString().replace(/[^0-9]/g, "") : "";
+        if (qMob === searchMobile) {
+          queueSheetRef.getRange(qIdx + 1, 7).setValue("Called");
+          break;
+        }
+      }
+    }
+    
     if (rowIndex !== -1) {
       // Overwrite the existing client row in-place (Edit mode)
       sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
@@ -204,7 +262,34 @@ function doGet(e) {
     // Automatically find the sheet tab that contains the telecaller logs (Self-Healing)
     var sheet = findLogsSheet(ss);
     
-    // Check if the request is to pull data
+    // Check if request is to pull central Lead Queue
+    if (e && e.parameter && e.parameter.action === "fetch_queue") {
+      var qSheet = ss.getSheetByName("Lead Queue");
+      var qList = [];
+      if (qSheet && qSheet.getLastRow() > 1) {
+        var qValues = qSheet.getRange(2, 1, qSheet.getLastRow() - 1, 7).getValues();
+        qValues.forEach(function(r) {
+          var mob = r[2] ? r[2].toString().replace(/[^0-9]/g, "") : "";
+          if (mob) {
+            qList.push({
+              id: r[0] || ("lead_" + Math.random()),
+              name: r[1] || "Lead",
+              mobile: mob,
+              age: r[3] || "",
+              gender: r[4] || "",
+              city: r[5] || "",
+              status: r[6] || "Pending"
+            });
+          }
+        });
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        queue: qList
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Check if the request is to pull call data
     if (e && e.parameter && e.parameter.action === "fetch") {
       var lastRow = sheet.getLastRow();
       var dataList = [];
@@ -250,51 +335,29 @@ function doGet(e) {
               if (rawTimestamp instanceof Date && !isNaN(rawTimestamp.getTime())) {
                 timestampStr = rawTimestamp.toISOString();
               } else if (rawTimestamp) {
-                var parsedDate = new Date(rawTimestamp);
-                if (!isNaN(parsedDate.getTime())) {
-                  timestampStr = parsedDate.toISOString();
-                } else {
-                  timestampStr = new Date().toISOString();
-                }
+                timestampStr = new Date(rawTimestamp).toISOString();
               } else {
                 timestampStr = new Date().toISOString();
               }
-            } catch (dateErr) {
+            } catch (e) {
               timestampStr = new Date().toISOString();
             }
             
-            // Safe Mobile Number Parsing
-            var mobileStr = "";
-            var rawMobile = row[colMobile];
-            if (rawMobile !== null && rawMobile !== undefined) {
-              mobileStr = rawMobile.toString().trim();
-              // If scientific or float with trailing .0, clean it
-              if (mobileStr.indexOf('.') !== -1) {
-                mobileStr = mobileStr.split('.')[0];
-              }
-              mobileStr = mobileStr.replace(/'/g, "");
-            }
-            
-            var ageVal = row[colAge];
-            if (ageVal === "N/A" || ageVal === "" || ageVal === undefined || ageVal === null) {
-              ageVal = "";
-            } else {
-              ageVal = parseInt(ageVal, 10) || "";
-            }
-            
-            var apptGiven = row[colApptGiven] === "Yes" || row[colApptGiven] === true;
-            var biReq = row[colBiReq] === "Yes" || row[colBiReq] === true;
-            
-            // Bulletproof string conversion for all fields
-            var gender = row[colGender] ? row[colGender].toString().trim() : "N/A";
-            var status = row[colStatus] ? row[colStatus].toString().trim() : "Thinking";
-            var apptDate = row[colApptDate] === "N/A" || !row[colApptDate] ? null : row[colApptDate].toString().trim();
-            var biProduct = row[colBiProd] === "N/A" || !row[colBiProd] ? null : row[colBiProd].toString().trim();
-            var comments = row[colComments] === "N/A" || !row[colComments] ? "" : row[colComments].toString().trim();
-            var addedBy = row[colAddedBy] === "N/A" || !row[colAddedBy] ? "" : row[colAddedBy].toString().trim();
-            
+            var mobileStr = row[colMobile] ? row[colMobile].toString().replace(/[^0-9]/g, "") : "";
+            var ageVal = row[colAge] ? parseInt(row[colAge], 10) || "" : "";
+            var gender = row[colGender] ? row[colGender].toString().trim() : "";
+            var status = row[colStatus] ? row[colStatus].toString().trim() : "";
+            var apptGivenStr = row[colApptGiven] ? row[colApptGiven].toString().toLowerCase().trim() : "";
+            var apptGiven = (apptGivenStr === "yes" || apptGivenStr === "true");
+            var apptDate = row[colApptDate] ? row[colApptDate].toString().trim() : "";
+            var biReqStr = row[colBiReq] ? row[colBiReq].toString().toLowerCase().trim() : "";
+            var biReq = (biReqStr === "yes" || biReqStr === "true");
+            var biProduct = row[colBiProd] ? row[colBiProd].toString().trim() : "";
+            var comments = row[colComments] ? row[colComments].toString().trim() : "";
+            var addedBy = row[colAddedBy] ? row[colAddedBy].toString().trim() : "";
+
             dataList.push({
-              id: timestampStr + "_" + mobileStr, // Composite Unique ID
+              id: "remote_" + i + "_" + mobileStr,
               timestamp: timestampStr,
               name: customerName,
               mobile: mobileStr,
