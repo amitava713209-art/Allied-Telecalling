@@ -373,9 +373,9 @@
           </div>
 
           <div class="filter-group">
-            <div class="date-filter-wrapper" style="display:flex; align-items:center; gap:0.35rem;">
+            <div class="date-filter-wrapper" style="position:relative; display:flex; align-items:center;">
               <input type="date" id="filter-date" class="date-filter-input" onchange="filterCallHistory()" title="Filter by Date">
-              <button type="button" class="btn-secondary" style="padding:0.45rem 0.75rem; font-size:0.75rem; font-weight:600; white-space:nowrap; background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;" onclick="clearDateFilter()" title="Show All Dates">All Dates</button>
+              <button type="button" class="btn-clear-date" onclick="clearDateFilter()" title="Clear Date & Show All Logs" style="position:absolute; right:2.2rem; background:transparent; border:none; color:#64748b; cursor:pointer; font-size:0.85rem; font-weight:700; padding:0 4px;">✕</button>
             </div>
 
             <div class="select-wrapper">
