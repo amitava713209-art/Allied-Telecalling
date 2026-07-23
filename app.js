@@ -1165,7 +1165,9 @@ function filterCallHistory() {
     if (dateFilter) {
       const recDate = getLocalDateISO(record.timestamp);
       const apptDate = getLocalDateISO(record.appointmentDate);
-      matchesDate = (recDate === dateFilter) || (apptDate === dateFilter);
+      const rawTimestamp = record.timestamp ? String(record.timestamp) : "";
+      const rawAppt = record.appointmentDate ? String(record.appointmentDate) : "";
+      matchesDate = (recDate === dateFilter) || (apptDate === dateFilter) || rawTimestamp.includes(dateFilter) || rawAppt.includes(dateFilter);
     }
 
     return matchesSearch && matchesStatus && matchesAppointment && matchesDate;
