@@ -1676,7 +1676,7 @@ button {
 
   /* Traditional table layout hiding */
   .table-responsive {
-    display: none !important;
+    display: block;
   }
 
   /* Mobile bottom tab navigation bar */
