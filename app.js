@@ -298,15 +298,22 @@ async function fetchRemoteLogs() {
 
     // If opening locally as file://, use script tag injection directly to bypass browser CORS blocks
     if (window.location.protocol === "file:") {
+      // Remove any existing sync scripts to prevent duplicate callback delays
+      const oldScripts = document.querySelectorAll("script[data-sync-script='true']");
+      oldScripts.forEach(s => s.remove());
+
       const scriptTag = document.createElement("script");
-      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName;
+      scriptTag.setAttribute("data-sync-script", "true");
+      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName + "&_t=" + Date.now();
       scriptTag.onload = function() {
         if (refreshIcon) refreshIcon.classList.remove("spin-icon");
         if (refreshBtn) refreshBtn.disabled = false;
+        if (scriptTag && scriptTag.parentNode) scriptTag.parentNode.removeChild(scriptTag);
       };
       scriptTag.onerror = function() {
         if (refreshIcon) refreshIcon.classList.remove("spin-icon");
         if (refreshBtn) refreshBtn.disabled = false;
+        if (scriptTag && scriptTag.parentNode) scriptTag.parentNode.removeChild(scriptTag);
       };
       document.body.appendChild(scriptTag);
       return;
