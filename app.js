@@ -1829,3 +1829,60 @@ function deleteAudioRecording() {
   if (player) player.src = "";
   if (previewContainer) previewContainer.classList.add("hidden");
 }
+
+// --- 📞 OUTBOUND CALLS AUDIT MODAL HANDLERS ---
+function openCallsAuditModal() {
+  const modal = document.getElementById("calls-audit-modal");
+  const tableBody = document.getElementById("audit-table-body");
+  const totalCountEl = document.getElementById("audit-total-count");
+  const uniqueCountEl = document.getElementById("audit-unique-count");
+
+  if (!modal || !tableBody) return;
+
+  // Filter logs for official customer calls
+  const validLogs = callLogs.filter(r => r.mobile && r.mobile.toString().replace(/[^0-9]/g, "").length >= 10);
+
+  const uniqueMobiles = new Set();
+  validLogs.forEach(r => {
+    const cleanMob = r.mobile.toString().replace(/[^0-9]/g, "");
+    if (cleanMob.length >= 10) uniqueMobiles.add(cleanMob);
+  });
+
+  if (totalCountEl) totalCountEl.textContent = validLogs.length;
+  if (uniqueCountEl) uniqueCountEl.textContent = uniqueMobiles.size;
+
+  if (validLogs.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="5" style="padding:2rem; text-align:center; color:var(--text-muted);">
+          No official calls recorded today. Click <strong>Sync All Data</strong> to fetch team logs.
+        </td>
+      </tr>
+    `;
+  } else {
+    tableBody.innerHTML = "";
+    validLogs.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.style.borderBottom = "1px solid var(--border-color)";
+      const timeStr = r.timestamp ? formatDateTimeReadable(r.timestamp) : "—";
+      const cleanMob = r.mobile.toString().replace(/[^0-9]/g, "");
+
+      tr.innerHTML = `
+        <td style="padding:0.6rem 0.85rem; font-size:0.75rem; color:var(--text-muted);">${timeStr}</td>
+        <td style="padding:0.6rem 0.85rem; font-weight:600; color:var(--text-main);">${escapeHtml(r.name)}</td>
+        <td style="padding:0.6rem 0.85rem; font-weight:700; color:var(--primary); font-family:monospace;">${cleanMob}</td>
+        <td style="padding:0.6rem 0.85rem; color:var(--text-muted);">${escapeHtml(r.addedBy || "N/A")}</td>
+        <td style="padding:0.6rem 0.85rem;"><span class="tbl-badge tbl-badge-interested" style="font-size:0.7rem; padding:0.15rem 0.4rem;">${r.status || "Called"}</span></td>
+      `;
+      tableBody.appendChild(tr);
+    });
+  }
+
+  modal.classList.remove("hidden-modal");
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeCallsAuditModal() {
+  const modal = document.getElementById("calls-audit-modal");
+  if (modal) modal.classList.add("hidden-modal");
+}

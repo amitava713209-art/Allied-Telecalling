@@ -54,12 +54,12 @@
 
     <!-- Analytics Dashboard Cards -->
     <section class="analytics-container animate-slide-down">
-      <div class="stat-card card-glow-indigo">
+      <div class="stat-card card-glow-indigo" onclick="openCallsAuditModal()" style="cursor:pointer;" title="Click to view full call breakdown & numbers dialed">
         <div class="stat-icon bg-soft-indigo">
           <i data-lucide="users"></i>
         </div>
         <div class="stat-content">
-          <span class="stat-label">Total Calls Today</span>
+          <span class="stat-label">Total Calls Today <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
           <h3 id="stat-total-calls">0</h3>
         </div>
       </div>
@@ -528,5 +528,60 @@
 
   <!-- Application Script -->
   <script src="app.js"></script>
+  <!-- ==========================================================================
+       📞 OUTBOUND CALLS AUDIT MODAL (NUMBERS DIALED BREAKDOWN)
+       ========================================================================== -->
+  <div class="modal-overlay hidden-modal" id="calls-audit-modal">
+    <div class="modal-container" style="max-width: 680px;">
+      <div class="modal-header">
+        <div class="modal-header-title">
+          <i data-lucide="phone-call" style="color:var(--primary);"></i>
+          <h3>Daily Outbound Calls Audit</h3>
+        </div>
+        <button class="icon-btn" onclick="closeCallsAuditModal()" title="Close Modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 1.25rem;">
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1rem;">
+          Detailed breakdown of unique numbers called through the app today to verify caller productivity and prevent personal call disputes.
+        </p>
+
+        <div style="background:#f8fafc; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.85rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Verified Official Calls</span>
+            <strong id="audit-total-count" style="font-size:1.4rem; color:var(--primary);">0</strong>
+          </div>
+          <div>
+            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Unique Numbers Dialed</span>
+            <strong id="audit-unique-count" style="font-size:1.4rem; color:var(--success-text);">0</strong>
+          </div>
+        </div>
+
+        <div style="max-height:340px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-md);">
+          <table style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
+            <thead>
+              <tr style="background:#f1f5f9; border-bottom:1px solid var(--border-color);">
+                <th style="padding:0.6rem 0.85rem;">Time</th>
+                <th style="padding:0.6rem 0.85rem;">Customer Name</th>
+                <th style="padding:0.6rem 0.85rem;">Mobile Number Dialed</th>
+                <th style="padding:0.6rem 0.85rem;">Caller Agent</th>
+                <th style="padding:0.6rem 0.85rem;">Call Status</th>
+              </tr>
+            </thead>
+            <tbody id="audit-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="closeCallsAuditModal()">Close Audit Report</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
