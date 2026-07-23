@@ -27,12 +27,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1. Load data from LocalStorage
   loadStoredData();
   
-  // 2. Display current date nicely and set default date filter to today
+  // 2. Display current date nicely
   displayCurrentDate();
-  const dateInput = document.getElementById("filter-date");
-  if (dateInput) {
-    dateInput.value = getLocalDateISO(new Date());
-  }
   
   // 3. Render initial views
   renderHistoryTable();
