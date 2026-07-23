@@ -54,7 +54,7 @@
 
     <!-- Analytics Dashboard Cards -->
     <section class="analytics-container animate-slide-down">
-      <div class="stat-card card-glow-indigo" onclick="openCallsAuditModal()" style="cursor:pointer;" title="Click to view full call breakdown & numbers dialed">
+      <div class="stat-card card-glow-indigo" onclick="openCallsAuditModal('all')" style="cursor:pointer;" title="Click to view total calls breakdown">
         <div class="stat-icon bg-soft-indigo">
           <i data-lucide="users"></i>
         </div>
@@ -64,32 +64,32 @@
         </div>
       </div>
 
-      <div class="stat-card card-glow-emerald">
+      <div class="stat-card card-glow-emerald" onclick="openCallsAuditModal('appointments')" style="cursor:pointer;" title="Click to view all secured appointments details">
         <div class="stat-icon bg-soft-emerald">
           <i data-lucide="calendar-check"></i>
         </div>
         <div class="stat-content">
-          <span class="stat-label">Appointments Secured</span>
+          <span class="stat-label">Appointments Secured <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
           <h3 id="stat-appointments">0 <span class="percentage" id="stat-appointments-pct">(0%)</span></h3>
         </div>
       </div>
 
-      <div class="stat-card card-glow-purple">
+      <div class="stat-card card-glow-purple" onclick="openCallsAuditModal('bi')" style="cursor:pointer;" title="Click to view BI request customer details">
         <div class="stat-icon bg-soft-purple">
           <i data-lucide="file-text"></i>
         </div>
         <div class="stat-content">
-          <span class="stat-label">BI Requests</span>
+          <span class="stat-label">BI Requests <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
           <h3 id="stat-bi-requests">0</h3>
         </div>
       </div>
 
-      <div class="stat-card card-glow-amber">
+      <div class="stat-card card-glow-amber" onclick="openCallsAuditModal('interested')" style="cursor:pointer;" title="Click to view interested leads details">
         <div class="stat-icon bg-soft-amber">
           <i data-lucide="heart-handshake"></i>
         </div>
         <div class="stat-content">
-          <span class="stat-label">Interested Leads</span>
+          <span class="stat-label">Interested Leads <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
           <h3 id="stat-interested">0 <span class="percentage" id="stat-interested-pct">(0%)</span></h3>
         </div>
       </div>

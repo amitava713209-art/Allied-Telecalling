@@ -1830,49 +1830,72 @@ function deleteAudioRecording() {
   if (previewContainer) previewContainer.classList.add("hidden");
 }
 
-// --- 📞 OUTBOUND CALLS AUDIT MODAL HANDLERS ---
-function openCallsAuditModal() {
+// --- 📞 OUTBOUND CALLS AUDIT & STAT BREAKDOWN MODAL HANDLERS ---
+function openCallsAuditModal(filterCategory = 'all') {
   const modal = document.getElementById("calls-audit-modal");
   const tableBody = document.getElementById("audit-table-body");
   const totalCountEl = document.getElementById("audit-total-count");
   const uniqueCountEl = document.getElementById("audit-unique-count");
+  const titleEl = document.querySelector("#calls-audit-modal h3");
 
   if (!modal || !tableBody) return;
 
-  // Filter logs for official customer calls
-  const validLogs = callLogs.filter(r => r.mobile && r.mobile.toString().replace(/[^0-9]/g, "").length >= 10);
+  // Base list of valid call records
+  let filteredList = callLogs.filter(r => r.mobile && r.mobile.toString().replace(/[^0-9]/g, "").length >= 10);
+  let categoryTitle = "Daily Outbound Calls Audit";
+
+  if (filterCategory === 'appointments') {
+    filteredList = filteredList.filter(r => r.appointmentGiven === true);
+    categoryTitle = "Appointments Secured Breakdown";
+  } else if (filterCategory === 'bi') {
+    filteredList = filteredList.filter(r => r.biRequired === true);
+    categoryTitle = "BI Requests Customer Breakdown";
+  } else if (filterCategory === 'interested') {
+    filteredList = filteredList.filter(r => r.status === "Interested");
+    categoryTitle = "Interested Leads Breakdown";
+  }
+
+  if (titleEl) titleEl.textContent = categoryTitle;
 
   const uniqueMobiles = new Set();
-  validLogs.forEach(r => {
+  filteredList.forEach(r => {
     const cleanMob = r.mobile.toString().replace(/[^0-9]/g, "");
     if (cleanMob.length >= 10) uniqueMobiles.add(cleanMob);
   });
 
-  if (totalCountEl) totalCountEl.textContent = validLogs.length;
+  if (totalCountEl) totalCountEl.textContent = filteredList.length;
   if (uniqueCountEl) uniqueCountEl.textContent = uniqueMobiles.size;
 
-  if (validLogs.length === 0) {
+  if (filteredList.length === 0) {
     tableBody.innerHTML = `
       <tr>
         <td colspan="5" style="padding:2rem; text-align:center; color:var(--text-muted);">
-          No official calls recorded today. Click <strong>Sync All Data</strong> to fetch team logs.
+          No matching records found for this category. Click <strong>Sync All Data</strong> to fetch team logs.
         </td>
       </tr>
     `;
   } else {
     tableBody.innerHTML = "";
-    validLogs.forEach(r => {
+    filteredList.forEach(r => {
       const tr = document.createElement("tr");
       tr.style.borderBottom = "1px solid var(--border-color)";
       const timeStr = r.timestamp ? formatDateTimeReadable(r.timestamp) : "—";
       const cleanMob = r.mobile.toString().replace(/[^0-9]/g, "");
+
+      let statusBadge = `<span class="tbl-badge tbl-badge-interested" style="font-size:0.7rem; padding:0.15rem 0.4rem;">${r.status || "Called"}</span>`;
+      if (r.appointmentGiven) {
+        statusBadge += `<br><span style="font-size:0.68rem; color:#059669; font-weight:700;">📅 ${formatDateTimeReadable(r.appointmentDate)}</span>`;
+      }
+      if (r.biRequired) {
+        statusBadge += `<br><span style="font-size:0.68rem; color:#4338ca; font-weight:700;">📄 BI: ${escapeHtml(r.biProduct || "Req")}</span>`;
+      }
 
       tr.innerHTML = `
         <td style="padding:0.6rem 0.85rem; font-size:0.75rem; color:var(--text-muted);">${timeStr}</td>
         <td style="padding:0.6rem 0.85rem; font-weight:600; color:var(--text-main);">${escapeHtml(r.name)}</td>
         <td style="padding:0.6rem 0.85rem; font-weight:700; color:var(--primary); font-family:monospace;">${cleanMob}</td>
         <td style="padding:0.6rem 0.85rem; color:var(--text-muted);">${escapeHtml(r.addedBy || "N/A")}</td>
-        <td style="padding:0.6rem 0.85rem;"><span class="tbl-badge tbl-badge-interested" style="font-size:0.7rem; padding:0.15rem 0.4rem;">${r.status || "Called"}</span></td>
+        <td style="padding:0.6rem 0.85rem;">${statusBadge}</td>
       `;
       tableBody.appendChild(tr);
     });
