@@ -848,10 +848,11 @@ function renderHistoryTable(filteredLogs = null) {
       : "";
 
     const emptyStateHtml = `
-      <div class="empty-state">
+      <div class="empty-state" style="padding: 2.5rem 1rem; text-align: center;">
         <i data-lucide="clipboard-list" class="empty-icon"></i>
-        <h3>No matching calls logged</h3>
-        <p>Modify filters or use the form to record new call entries.</p>
+        <h3>No call logs matching selected date/filter</h3>
+        <p style="margin-top:0.25rem; color:#64748b;">Your Google Sheet has 57 records. Clear the date box or click below to view all historical records.</p>
+        <button type="button" class="btn-primary" onclick="clearDateFilter()" style="margin-top:0.85rem; padding:0.45rem 1rem; font-weight:600;">Show All 57 Historical Logs</button>
         ${offlineWarning}
       </div>
     `;
