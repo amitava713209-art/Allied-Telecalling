@@ -880,7 +880,7 @@ function renderHistoryTable(filteredLogs = null) {
 
   activeLogs.forEach(record => {
     // RENDER DESKTOP TABULAR VIEW
-    if (tableBody && !isMobile) {
+    if (tableBody) {
       const tr = document.createElement("tr");
       tr.setAttribute("data-id", record.id);
 
