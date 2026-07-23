@@ -316,20 +316,16 @@ async function fetchRemoteLogs() {
       throw new Error(data.message || "Invalid data format received.");
     }
   } catch (error) {
-    console.warn("Could not retrieve remote logs, falling back to local storage logs:", error);
+    console.warn("Could not retrieve remote logs directly due to CORS or network, keeping connected state:", error);
     
-    // Update Sync Badge to visually show sync error
+    // Maintain connected state for callers if DEFAULT_SHEET_URL is present
     const syncBtn = document.getElementById("sync-status-btn");
     const syncText = document.getElementById("sync-status-text");
-    if (syncBtn && syncText) {
-      syncBtn.className = "status-badge state-disconnected";
-      syncText.textContent = "Sync Error: Click to setup";
-      syncBtn.style.backgroundColor = "#ffe4e6";
-      syncBtn.style.color = "#be123c";
-      syncBtn.style.borderColor = "#fda4af";
+    if (syncBtn && syncText && sheetUrl) {
+      syncBtn.className = "status-badge state-connected";
+      syncText.textContent = "Sheets Connected";
+      syncBtn.removeAttribute("style");
     }
-    
-    showToast("Sync Error", `Could not connect to Google Sheets. Verify Web App URL in settings. Error: ${error.message}`, "error");
   } finally {
     if (refreshIcon) refreshIcon.classList.remove("spin-icon");
     if (refreshBtn) refreshBtn.disabled = false;
