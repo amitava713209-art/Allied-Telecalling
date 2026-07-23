@@ -866,10 +866,13 @@ button {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   overflow-x: auto;
+  overflow-y: auto;
   background-color: #ffffff;
   box-shadow: var(--shadow-sm);
+  min-height: 250px;
   max-height: 480px;
   position: relative;
+  display: block !important;
 }
 
 .history-table {
