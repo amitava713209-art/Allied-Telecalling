@@ -943,6 +943,7 @@ function renderHistoryTable(filteredLogs = null) {
       } else {
         apptContent = `<span class="appt-status appt-no">No</span>`;
       }
+      const appointmentCell = `<td><div class="appt-info">${apptContent}</div></td>`;
       let audioCell = "<td><span class='text-muted' style='font-size:0.75rem;'>No recording</span></td>";
       if (record.audioRecording && record.audioRecording.length > 50) {
         audioCell = `
