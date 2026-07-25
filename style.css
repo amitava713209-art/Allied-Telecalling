@@ -1633,13 +1633,16 @@ button {
   }
 
   .workspace-grid {
-    grid-template-columns: 1fr !important;
+    display: flex !important;
+    flex-direction: column !important;
     gap: 1rem;
     margin-bottom: 2rem;
   }
 
-  .form-panel, .table-panel {
-    padding: 1.25rem 1rem;
+  .lead-queue-panel.mobile-tab-hidden,
+  .form-panel.mobile-tab-hidden,
+  .table-panel.mobile-tab-hidden {
+    display: none !important;
   }
   
   .panel-header-row {

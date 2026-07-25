@@ -1970,19 +1970,19 @@ function switchMobileTab(tabName) {
   if (btnHistory) btnHistory.classList.remove("active");
 
   if (tabName === 'queue') {
-    if (queueSection) queueSection.style.display = "block";
-    if (formSection) formSection.style.display = "none";
-    if (historySection) historySection.style.display = "none";
+    if (queueSection) queueSection.classList.remove("mobile-tab-hidden");
+    if (formSection) formSection.classList.add("mobile-tab-hidden");
+    if (historySection) historySection.classList.add("mobile-tab-hidden");
     if (btnQueue) btnQueue.classList.add("active");
   } else if (tabName === 'form') {
-    if (queueSection) queueSection.style.display = "none";
-    if (formSection) formSection.style.display = "block";
-    if (historySection) historySection.style.display = "none";
+    if (queueSection) queueSection.classList.add("mobile-tab-hidden");
+    if (formSection) formSection.classList.remove("mobile-tab-hidden");
+    if (historySection) historySection.classList.add("mobile-tab-hidden");
     if (btnForm) btnForm.classList.add("active");
   } else if (tabName === 'history') {
-    if (queueSection) queueSection.style.display = "none";
-    if (formSection) formSection.style.display = "none";
-    if (historySection) historySection.style.display = "block";
+    if (queueSection) queueSection.classList.add("mobile-tab-hidden");
+    if (formSection) formSection.classList.add("mobile-tab-hidden");
+    if (historySection) historySection.classList.remove("mobile-tab-hidden");
     if (btnHistory) btnHistory.classList.add("active");
   }
 
