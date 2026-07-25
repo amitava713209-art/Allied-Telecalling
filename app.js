@@ -36,9 +36,11 @@ document.addEventListener("DOMContentLoaded", () => {
   recalculateAnalytics();
   updateSyncBadge();
 
-  // 4. Trigger Automatic Remote Fetch from Sheets (2-Way Sync)
-  fetchRemoteLogs();
-  fetchCentralLeadQueue();
+  // 4. Trigger Automatic Remote Fetch from Sheets in background (Non-blocking)
+  setTimeout(() => {
+    fetchRemoteLogs();
+    fetchCentralLeadQueue();
+  }, 100);
 
   // 5. Pre-populate Caller Agent Name from LocalStorage
   const agentInput = document.getElementById("caller-name");
