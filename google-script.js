@@ -283,10 +283,17 @@ function doGet(e) {
           }
         });
       }
-      return ContentService.createTextOutput(JSON.stringify({
+      var qObj = {
         status: "success",
         queue: qList
-      })).setMimeType(ContentService.MimeType.JSON);
+      };
+
+      if (e && e.parameter && e.parameter.callback) {
+        return ContentService.createTextOutput(e.parameter.callback + "(" + JSON.stringify(qObj) + ")")
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+
+      return ContentService.createTextOutput(JSON.stringify(qObj)).setMimeType(ContentService.MimeType.JSON);
     }
     
     // Check if the request is to pull call data

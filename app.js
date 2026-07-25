@@ -38,6 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 4. Trigger Automatic Remote Fetch from Sheets (2-Way Sync)
   fetchRemoteLogs();
+  fetchCentralLeadQueue();
 
   // 5. Pre-populate Caller Agent Name from LocalStorage
   const agentInput = document.getElementById("caller-name");
@@ -1605,6 +1606,24 @@ async function syncCentralLeadQueue(newLeads) {
 async function fetchCentralLeadQueue() {
   if (!sheetUrl) return;
   try {
+    const callbackName = "handleCentralQueueFallback";
+    window[callbackName] = function(data) {
+      if (data && data.status === "success" && data.queue) {
+        mergeLeadQueue(data.queue);
+        saveLeadQueueToLocalStorage();
+        renderLeadQueue();
+      }
+    };
+
+    if (window.location.protocol === "file:") {
+      const scriptTag = document.createElement("script");
+      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue&callback=" + callbackName + "&_t=" + Date.now();
+      scriptTag.onload = () => scriptTag.remove();
+      scriptTag.onerror = () => scriptTag.remove();
+      document.body.appendChild(scriptTag);
+      return;
+    }
+
     const fetchUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue";
     const response = await fetch(fetchUrl, { method: "GET", mode: "cors" });
     if (response.ok) {
@@ -1616,7 +1635,13 @@ async function fetchCentralLeadQueue() {
       }
     }
   } catch (err) {
-    console.warn("Could not fetch remote lead queue:", err);
+    console.warn("Could not fetch remote lead queue directly, attempting script fallback:", err);
+    try {
+      const scriptTag = document.createElement("script");
+      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue&callback=handleCentralQueueFallback&_t=" + Date.now();
+      scriptTag.onload = () => scriptTag.remove();
+      document.body.appendChild(scriptTag);
+    } catch(e) {}
   }
 }
 
