@@ -1949,3 +1949,51 @@ function closeCallsAuditModal() {
   const modal = document.getElementById("calls-audit-modal");
   if (modal) modal.classList.add("hidden-modal");
 }
+
+// --- 📱 MOBILE TAB SWITCHER ENGINE ---
+function switchMobileTab(tabName) {
+  if (window.innerWidth > 768) return;
+
+  const queueSection = document.querySelector(".lead-queue-panel");
+  const formSection = document.getElementById("form-panel-section");
+  const historySection = document.querySelector(".table-panel");
+
+  const btnQueue = document.getElementById("nav-btn-queue");
+  const btnForm = document.getElementById("nav-btn-form");
+  const btnHistory = document.getElementById("nav-btn-history");
+
+  // Reset active buttons
+  if (btnQueue) btnQueue.classList.remove("active");
+  if (btnForm) btnForm.classList.remove("active");
+  if (btnHistory) btnHistory.classList.remove("active");
+
+  if (tabName === 'queue') {
+    if (queueSection) queueSection.style.display = "block";
+    if (formSection) formSection.style.display = "none";
+    if (historySection) historySection.style.display = "none";
+    if (btnQueue) btnQueue.classList.add("active");
+  } else if (tabName === 'form') {
+    if (queueSection) queueSection.style.display = "none";
+    if (formSection) formSection.style.display = "block";
+    if (historySection) historySection.style.display = "none";
+    if (btnForm) btnForm.classList.add("active");
+  } else if (tabName === 'history') {
+    if (queueSection) queueSection.style.display = "none";
+    if (formSection) formSection.style.display = "none";
+    if (historySection) historySection.style.display = "block";
+    if (btnHistory) btnHistory.classList.add("active");
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 768) {
+    const queueSection = document.querySelector(".lead-queue-panel");
+    const formSection = document.getElementById("form-panel-section");
+    const historySection = document.querySelector(".table-panel");
+    if (queueSection) queueSection.style.display = "";
+    if (formSection) formSection.style.display = "";
+    if (historySection) historySection.style.display = "";
+  }
+});
