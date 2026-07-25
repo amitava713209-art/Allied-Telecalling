@@ -1639,7 +1639,6 @@ button {
   }
 
   .form-panel, .table-panel {
-    display: block !important;
     padding: 1.25rem 1rem;
   }
   
