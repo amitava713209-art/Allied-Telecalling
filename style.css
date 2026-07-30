@@ -940,6 +940,7 @@ button {
   font-weight: 600;
 }
 
+.tbl-badge-hot-list { background-color: #ffe4e6; color: #e11d48; border: 1px solid #fecdd3; font-weight: 700; }
 .tbl-badge-interested { background-color: var(--success-light); color: var(--success-text); }
 .tbl-badge-thinking { background-color: var(--secondary-light); color: var(--secondary); }
 .tbl-badge-refused { background-color: var(--danger-light); color: var(--danger-text); }

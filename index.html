@@ -57,6 +57,16 @@
 
     <!-- Analytics Dashboard Cards -->
     <section class="analytics-container animate-slide-down">
+      <div class="stat-card card-glow-rose" onclick="openCallsAuditModal('hotlist')" style="cursor:pointer; background:#fff1f2; border:1px solid #fecdd3;" title="Click to view all High Priority Hot List prospects">
+        <div class="stat-icon" style="background:#ffe4e6; color:#e11d48;">
+          <i data-lucide="flame"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-label" style="color:#9f1239; font-weight:700;">🔥 Hot List <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
+          <h3 id="stat-hot-list" style="color:#9f1239;">0 <span class="percentage" id="stat-hot-list-pct">(0%)</span></h3>
+        </div>
+      </div>
+
       <div class="stat-card card-glow-indigo" onclick="openCallsAuditModal('all')" style="cursor:pointer;" title="Click to view total calls breakdown">
         <div class="stat-icon bg-soft-indigo">
           <i data-lucide="users"></i>
@@ -185,6 +195,13 @@
               Call Status <span class="required">*</span>
             </label>
             <div class="segmented-control">
+              <label class="segment-option">
+                <input type="radio" name="call-status" value="Hot List" required>
+                <span class="segment-btn badge-hot-list" style="background:#fef2f2; color:#dc2626; border-color:#fca5a5;">
+                  <i data-lucide="flame" style="color:#dc2626;"></i>
+                  🔥 Hot List
+                </span>
+              </label>
               <label class="segment-option">
                 <input type="radio" name="call-status" value="Interested" checked required>
                 <span class="segment-btn badge-interested">
@@ -392,6 +409,7 @@
             <div class="select-wrapper">
               <select id="filter-status" onchange="filterCallHistory()">
                 <option value="All">All Statuses</option>
+                <option value="Hot List">🔥 Hot List Only</option>
                 <option value="Interested">Interested</option>
                 <option value="Thinking">Thinking</option>
                 <option value="Not Interested">Not Interested</option>

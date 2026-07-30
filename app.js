@@ -837,6 +837,11 @@ function recalculateAnalytics() {
   const totalCalls = callLogs.length;
   document.getElementById("stat-total-calls").textContent = totalCalls;
 
+  const hotCount = callLogs.filter(r => r.status === "Hot List").length;
+  const hotPct = totalCalls > 0 ? Math.round((hotCount / totalCalls) * 100) : 0;
+  const hotEl = document.getElementById("stat-hot-list");
+  if (hotEl) hotEl.innerHTML = `${hotCount} <span class="percentage" id="stat-hot-list-pct">(${hotPct}%)</span>`;
+
   const apptsCount = callLogs.filter(r => r.appointmentGiven).length;
   const apptsPct = totalCalls > 0 ? Math.round((apptsCount / totalCalls) * 100) : 0;
   document.getElementById("stat-appointments").innerHTML = `${apptsCount} <span class="percentage" id="stat-appointments-pct">(${apptsPct}%)</span>`;
@@ -932,7 +937,10 @@ function renderHistoryTable(filteredLogs = null) {
 
       let statusClass = "tbl-badge-thinking";
       let statusIcon = "message-square-more";
-      if (record.status === "Interested") {
+      if (record.status === "Hot List") {
+        statusClass = "tbl-badge-hot-list";
+        statusIcon = "flame";
+      } else if (record.status === "Interested") {
         statusClass = "tbl-badge-interested";
         statusIcon = "thumbs-up";
       } else if (record.status === "Not Interested") {
@@ -1886,7 +1894,10 @@ function openCallsAuditModal(filterCategory = 'all') {
   let filteredList = callLogs.filter(r => r.mobile && r.mobile.toString().replace(/[^0-9]/g, "").length >= 10);
   let categoryTitle = "Daily Outbound Calls Audit";
 
-  if (filterCategory === 'appointments') {
+  if (filterCategory === 'hotlist') {
+    filteredList = filteredList.filter(r => r.status === "Hot List");
+    categoryTitle = "🔥 Hot List Prospects Breakdown";
+  } else if (filterCategory === 'appointments') {
     filteredList = filteredList.filter(r => r.appointmentGiven === true);
     categoryTitle = "Appointments Secured Breakdown";
   } else if (filterCategory === 'bi') {
