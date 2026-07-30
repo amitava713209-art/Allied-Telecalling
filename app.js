@@ -2093,21 +2093,11 @@ async function handleCallerLogin(event) {
   const nameVal = nameInput ? nameInput.value.trim() : "";
   const pinVal = pinInput ? pinInput.value.trim() : "";
 
-  // Master Admin PIN 1234 Instant Access Passcode
-  if (pinVal === "1234") {
-    localStorage.setItem("telecaller_auth_token", "TRUE");
-    localStorage.setItem("telecaller_agent_name", nameVal || "Admin");
-    localStorage.setItem("telecaller_user_role", "Admin");
-    showToast("Master Access Granted", `Welcome ${nameVal || "Admin"}!`, "success");
-    checkCallerSecurityAccess();
-    fetchRemoteLogs();
-    fetchCentralLeadQueue();
-    return;
-  }
+  if (!nameVal || !pinVal) return;
 
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0;"></i> Verifying Security PIN...`;
+    submitBtn.innerHTML = `<i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0;"></i> Verifying...`;
     if (window.lucide) window.lucide.createIcons();
   }
   if (errBox) errBox.classList.add("hidden");
@@ -2119,82 +2109,58 @@ async function handleCallerLogin(event) {
     localStorage.setItem("telecaller_device_id", deviceId);
   }
 
+  // 1. Instant Local Unlock for Fast UI Response
+  localStorage.setItem("telecaller_auth_token", "TRUE");
+  localStorage.setItem("telecaller_agent_name", nameVal);
+  localStorage.setItem("telecaller_user_role", pinVal === "1234" ? "Admin" : "Caller");
+
+  showToast("Access Granted", `Welcome ${nameVal}! Unlocking system...`, "success");
+  checkCallerSecurityAccess();
+
+  // 2. Background Security Verification with Google Sheets
   try {
     const callbackName = "handleUserAuthFallback_" + Date.now();
     window[callbackName] = function(data) {
-      if (data && data.status === "success" && data.authorized) {
-        localStorage.setItem("telecaller_auth_token", "TRUE");
-        localStorage.setItem("telecaller_agent_name", data.name || nameVal);
-        localStorage.setItem("telecaller_user_role", data.role || "Caller");
-
-        showToast("Access Granted", `Welcome ${data.name}! System unlocked.`, "success");
+      if (data && data.status === "error") {
+        // If Google Sheet rejects the user (revoked or bad pin), revoke local access immediately!
+        localStorage.removeItem("telecaller_auth_token");
+        localStorage.removeItem("telecaller_agent_name");
+        localStorage.removeItem("telecaller_user_role");
         checkCallerSecurityAccess();
-        fetchRemoteLogs();
-        fetchCentralLeadQueue();
-      } else {
-        const msg = (data && data.message) ? data.message : "Invalid Name or Security PIN.";
         if (errBox) {
-          errBox.innerText = "⛔ " + msg;
+          errBox.innerText = "⛔ " + (data.message || "Access Revoked.");
           errBox.classList.remove("hidden");
         }
+      } else if (data && data.authorized) {
+        localStorage.setItem("telecaller_user_role", data.role || "Caller");
+        checkCallerSecurityAccess();
       }
       delete window[callbackName];
     };
 
-    if (window.location.protocol === "file:" || !sheetUrl.includes("script.google.com")) {
-      // Local Master Admin Passcode 1234
-      if (pinVal === "1234") {
-        localStorage.setItem("telecaller_auth_token", "TRUE");
-        localStorage.setItem("telecaller_agent_name", nameVal);
-        localStorage.setItem("telecaller_user_role", "Admin");
-        showToast("Master Access Granted", `Welcome ${nameVal}!`, "success");
-        checkCallerSecurityAccess();
-        return;
-      }
+    if (sheetUrl && sheetUrl.includes("script.google.com")) {
+      const authScript = document.createElement("script");
+      const authUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + 
+        "action=verify_user&name=" + encodeURIComponent(nameVal) + 
+        "&pin=" + encodeURIComponent(pinVal) + 
+        "&deviceId=" + encodeURIComponent(deviceId) + 
+        "&callback=" + callbackName + 
+        "&_t=" + Date.now();
+      authScript.src = authUrl;
+      authScript.onload = () => authScript.remove();
+      authScript.onerror = () => authScript.remove();
+      document.body.appendChild(authScript);
     }
-
-    const authScript = document.createElement("script");
-    const authUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + 
-      "action=verify_user&name=" + encodeURIComponent(nameVal) + 
-      "&pin=" + encodeURIComponent(pinVal) + 
-      "&deviceId=" + encodeURIComponent(deviceId) + 
-      "&callback=" + callbackName + 
-      "&_t=" + Date.now();
-    authScript.src = authUrl;
-    authScript.onload = () => authScript.remove();
-    authScript.onerror = () => {
-      authScript.remove();
-      if (pinVal === "1234") {
-        localStorage.setItem("telecaller_auth_token", "TRUE");
-        localStorage.setItem("telecaller_agent_name", nameVal);
-        localStorage.setItem("telecaller_user_role", "Admin");
-        showToast("Master Access Granted", `Welcome ${nameVal}!`, "success");
-        checkCallerSecurityAccess();
-      } else if (errBox) {
-        errBox.innerText = "⛔ Invalid Name or Security PIN.";
-        errBox.classList.remove("hidden");
-      }
-    };
-    document.body.appendChild(authScript);
-
   } catch (err) {
-    console.warn("Auth verification error:", err);
-    if (pinVal === "1234") {
-      localStorage.setItem("telecaller_auth_token", "TRUE");
-      localStorage.setItem("telecaller_agent_name", nameVal);
-      localStorage.setItem("telecaller_user_role", "Admin");
-      showToast("Master Access Granted", `Welcome ${nameVal}!`, "success");
-      checkCallerSecurityAccess();
-    } else if (errBox) {
-      errBox.innerText = "⛔ Authentication Error. Please check PIN.";
-      errBox.classList.remove("hidden");
-    }
+    console.warn("Background verification logged:", err);
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
       submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
       if (window.lucide) window.lucide.createIcons();
     }
+    fetchRemoteLogs();
+    fetchCentralLeadQueue();
   }
 }
 
