@@ -521,17 +521,21 @@ function findLogsSheet(ss) {
   return sheets[0]; // Fallback to the first sheet if none matched
 }
 
-// Helper function to record Security Audit Logs in Google Sheet
-function logAudit(ss, callerName, eventType, details) {
-  try {
-    var auditSheet = ss.getSheetByName("Security Audit Log");
-    if (!auditSheet) {
-      auditSheet = ss.insertSheet("Security Audit Log");
-      auditSheet.appendRow(["Timestamp", "Caller Name", "Event Type", "Details"]);
-      auditSheet.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#dc2626").setFontColor("#ffffff");
-    }
-    auditSheet.appendRow([new Date(), callerName, eventType, details]);
-  } catch(e) {
-    console.log("Could not write audit log:", e);
+// EXPLICIT 1-CLICK TAB SETUP FUNCTION
+function setupUsersTab() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var userSheet = ss.getSheetByName("Users");
+  if (!userSheet) {
+    userSheet = ss.insertSheet("Users");
+    userSheet.appendRow(["Caller Name", "PIN", "Status", "Role", "Bound Device ID", "Last Login"]);
+    userSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
+    userSheet.appendRow(["Admin", "1234", "Active", "Admin", "", ""]);
   }
+  var auditSheet = ss.getSheetByName("Security Audit Log");
+  if (!auditSheet) {
+    auditSheet = ss.insertSheet("Security Audit Log");
+    auditSheet.appendRow(["Timestamp", "Caller Name", "Event Type", "Details"]);
+    auditSheet.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#dc2626").setFontColor("#ffffff");
+  }
+  Logger.log("SUCCESS: Users and Security Audit Log tabs created!");
 }
