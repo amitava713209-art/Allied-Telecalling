@@ -1135,6 +1135,9 @@ function renderHistoryTable(filteredLogs = null) {
           <span class="m-card-time">${formatDateTimeReadable(record.timestamp)}</span>
           <div style="display:flex; align-items:center; gap:0.4rem;">
             ${syncContent}
+            <button class="btn-icon-only" onclick="toggleHotListRecord('${record.id}')" title="Mark Hot List" style="background:${record.status === 'Hot List' ? '#fee2e2' : '#f1f5f9'}; border:1px solid ${record.status === 'Hot List' ? '#fca5a5' : '#cbd5e1'};">
+              <i data-lucide="flame" style="width:13px; height:13px; color:${record.status === 'Hot List' ? '#dc2626' : '#64748b'};"></i>
+            </button>
             <button class="btn-icon-only btn-tbl-call" onclick="triggerClickToCall('${record.mobile}')" title="Call SIM">
               <i data-lucide="phone-call" style="width:13px; height:13px;"></i>
             </button>
@@ -1724,6 +1727,9 @@ function renderLeadQueue() {
           <span class="queue-status-badge ${statusBadgeClass}">${statusText}</span>
         </div>
         <div class="q-actions">
+          <button type="button" class="btn-q-action" onclick="toggleHotListLead('${lead.id}')" title="Toggle Hot List" style="background:${lead.status === 'Hot List' ? '#fee2e2' : '#f1f5f9'}; color:${lead.status === 'Hot List' ? '#dc2626' : '#64748b'}; border:1px solid ${lead.status === 'Hot List' ? '#fca5a5' : '#cbd5e1'};">
+            <i data-lucide="flame" style="color:${lead.status === 'Hot List' ? '#dc2626' : '#64748b'};"></i> ${lead.status === 'Hot List' ? 'Hot' : 'Hot'}
+          </button>
           <button type="button" class="btn-q-action btn-q-load" onclick="loadLeadToForm('${lead.id}')" title="Load Lead to Form">
             <i data-lucide="arrow-left-circle"></i> Load
           </button>
@@ -1762,6 +1768,28 @@ function loadLeadToForm(leadId) {
   if (window.innerWidth <= 768) {
     switchMobileTab('form');
   }
+}
+
+function toggleHotListLead(leadId) {
+  const item = leadQueue.find(l => l.id === leadId);
+  if (!item) return;
+  const isHot = item.status === "Hot List";
+  item.status = isHot ? "Pending" : "Hot List";
+  saveLeadQueueToLocalStorage();
+  renderLeadQueue();
+  showToast(isHot ? "Removed from Hot List" : "🔥 Added to Hot List", `Lead "${item.name}" updated.`, isHot ? "info" : "success");
+}
+
+function toggleHotListRecord(recordId) {
+  const rec = callLogs.find(r => r.id === recordId);
+  if (!rec) return;
+  const isHot = rec.status === "Hot List";
+  rec.status = isHot ? "Interested" : "Hot List";
+  saveLogsToLocalStorage();
+  filterCallHistory();
+  recalculateAnalytics();
+  triggerSheetSync(recordId);
+  showToast(isHot ? "Status Changed" : "🔥 Added to Hot List", `Record for "${rec.name}" updated to ${rec.status}.`, isHot ? "info" : "success");
 }
 
 function markLeadStatus(leadId, newStatus) {
