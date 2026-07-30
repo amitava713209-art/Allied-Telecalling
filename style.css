@@ -1119,8 +1119,8 @@ button {
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
   background-color: rgba(15, 23, 42, 0.85) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
@@ -1128,7 +1128,7 @@ button {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 1rem !important;
+  padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
   animation: fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
