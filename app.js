@@ -2097,7 +2097,7 @@ async function handleCallerLogin(event) {
 
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0;"></i> Verifying...`;
+    submitBtn.innerHTML = `<i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0;"></i> Verifying Credentials...`;
     if (window.lucide) window.lucide.createIcons();
   }
   if (errBox) errBox.classList.add("hidden");
@@ -2109,31 +2109,54 @@ async function handleCallerLogin(event) {
     localStorage.setItem("telecaller_device_id", deviceId);
   }
 
-  // 1. Instant Local Unlock for Fast UI Response
-  localStorage.setItem("telecaller_auth_token", "TRUE");
-  localStorage.setItem("telecaller_agent_name", nameVal);
-  localStorage.setItem("telecaller_user_role", pinVal === "1234" ? "Admin" : "Caller");
-
-  showToast("Access Granted", `Welcome ${nameVal}! Unlocking system...`, "success");
-  checkCallerSecurityAccess();
-
-  // 2. Background Security Verification with Google Sheets
+  // --- STRICT PRIOR AUTHENTICATION VERIFICATION ENGINE ---
   try {
-    const callbackName = "handleUserAuthFallback_" + Date.now();
+    const callbackName = "handleUserAuthStrict_" + Date.now();
+    
+    // Create timeout safety to handle slow network connections without hanging indefinitely
+    const authTimeout = setTimeout(() => {
+      delete window[callbackName];
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+      if (errBox) {
+        errBox.innerText = "⛔ Connection Timeout. Please check your internet connection and try again.";
+        errBox.classList.remove("hidden");
+      }
+    }, 10000);
+
     window[callbackName] = function(data) {
-      if (data && data.status === "error") {
-        // If Google Sheet rejects the user (revoked or bad pin), revoke local access immediately!
+      clearTimeout(authTimeout);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+
+      if (data && data.status === "success" && data.authorized) {
+        // STRICT VERIFICATION PASSED! Unlock app only now.
+        localStorage.setItem("telecaller_auth_token", "TRUE");
+        localStorage.setItem("telecaller_agent_name", data.name || nameVal);
+        localStorage.setItem("telecaller_user_role", data.role || "Caller");
+
+        showToast("Access Granted", `Welcome ${data.name}! System unlocked.`, "success");
+        checkCallerSecurityAccess();
+        fetchRemoteLogs();
+        fetchCentralLeadQueue();
+      } else {
+        // STRICT VERIFICATION FAILED! Keep app 100% locked.
         localStorage.removeItem("telecaller_auth_token");
         localStorage.removeItem("telecaller_agent_name");
         localStorage.removeItem("telecaller_user_role");
         checkCallerSecurityAccess();
+
+        const msg = (data && data.message) ? data.message : "Invalid Name or Security PIN.";
         if (errBox) {
-          errBox.innerText = "⛔ " + (data.message || "Access Revoked.");
+          errBox.innerText = "⛔ " + msg;
           errBox.classList.remove("hidden");
         }
-      } else if (data && data.authorized) {
-        localStorage.setItem("telecaller_user_role", data.role || "Caller");
-        checkCallerSecurityAccess();
       }
       delete window[callbackName];
     };
@@ -2148,19 +2171,44 @@ async function handleCallerLogin(event) {
         "&_t=" + Date.now();
       authScript.src = authUrl;
       authScript.onload = () => authScript.remove();
-      authScript.onerror = () => authScript.remove();
+      authScript.onerror = () => {
+        authScript.remove();
+        clearTimeout(authTimeout);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
+          if (window.lucide) window.lucide.createIcons();
+        }
+        if (errBox) {
+          errBox.innerText = "⛔ Verification failed. Unable to reach security server.";
+          errBox.classList.remove("hidden");
+        }
+      };
       document.body.appendChild(authScript);
+    } else {
+      clearTimeout(authTimeout);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+      if (errBox) {
+        errBox.innerText = "⛔ Google Sheet Web App URL not configured.";
+        errBox.classList.remove("hidden");
+      }
     }
+
   } catch (err) {
-    console.warn("Background verification logged:", err);
-  } finally {
+    console.warn("Strict Auth Error:", err);
     if (submitBtn) {
       submitBtn.disabled = false;
       submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
       if (window.lucide) window.lucide.createIcons();
     }
-    fetchRemoteLogs();
-    fetchCentralLeadQueue();
+    if (errBox) {
+      errBox.innerText = "⛔ Authentication Error. Please try again.";
+      errBox.classList.remove("hidden");
+    }
   }
 }
 
