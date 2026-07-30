@@ -2110,55 +2110,74 @@ async function handleCallerLogin(event) {
   }
 
   try {
-    const postData = {
-      action: "verify_user",
-      name: nameVal,
-      pin: pinVal,
-      deviceId: deviceId
+    const callbackName = "handleUserAuthFallback_" + Date.now();
+    window[callbackName] = function(data) {
+      if (data && data.status === "success" && data.authorized) {
+        localStorage.setItem("telecaller_auth_token", "TRUE");
+        localStorage.setItem("telecaller_agent_name", data.name || nameVal);
+        localStorage.setItem("telecaller_user_role", data.role || "Caller");
+
+        showToast("Access Granted", `Welcome ${data.name}! System unlocked.`, "success");
+        checkCallerSecurityAccess();
+        fetchRemoteLogs();
+        fetchCentralLeadQueue();
+      } else {
+        const msg = (data && data.message) ? data.message : "Invalid Name or Security PIN.";
+        if (errBox) {
+          errBox.innerText = "⛔ " + msg;
+          errBox.classList.remove("hidden");
+        }
+      }
+      delete window[callbackName];
     };
 
-    const response = await fetch(sheetUrl, {
-      method: "POST",
-      mode: "cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(postData)
-    });
-
-    let res = null;
-    if (response.ok) {
-      res = await response.json();
-    }
-
-    if (res && res.status === "success" && res.authorized) {
-      localStorage.setItem("telecaller_auth_token", "TRUE");
-      localStorage.setItem("telecaller_agent_name", res.name || nameVal);
-      localStorage.setItem("telecaller_user_role", res.role || "Caller");
-
-      showToast("Access Granted", `Welcome ${res.name}! System unlocked.`, "success");
-      checkCallerSecurityAccess();
-      fetchRemoteLogs();
-      fetchCentralLeadQueue();
-    } else {
-      const msg = (res && res.message) ? res.message : "Invalid Name or Security PIN.";
-      if (errBox) {
-        errBox.innerText = "⛔ " + msg;
-        errBox.classList.remove("hidden");
+    if (window.location.protocol === "file:" || !sheetUrl.includes("script.google.com")) {
+      // Local Master Admin Passcode 1234
+      if (pinVal === "1234") {
+        localStorage.setItem("telecaller_auth_token", "TRUE");
+        localStorage.setItem("telecaller_agent_name", nameVal);
+        localStorage.setItem("telecaller_user_role", "Admin");
+        showToast("Master Access Granted", `Welcome ${nameVal}!`, "success");
+        checkCallerSecurityAccess();
+        return;
       }
     }
+
+    const authScript = document.createElement("script");
+    const authUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + 
+      "action=verify_user&name=" + encodeURIComponent(nameVal) + 
+      "&pin=" + encodeURIComponent(pinVal) + 
+      "&deviceId=" + encodeURIComponent(deviceId) + 
+      "&callback=" + callbackName + 
+      "&_t=" + Date.now();
+    authScript.src = authUrl;
+    authScript.onload = () => authScript.remove();
+    authScript.onerror = () => {
+      authScript.remove();
+      if (pinVal === "1234") {
+        localStorage.setItem("telecaller_auth_token", "TRUE");
+        localStorage.setItem("telecaller_agent_name", nameVal);
+        localStorage.setItem("telecaller_user_role", "Admin");
+        showToast("Master Access Granted", `Welcome ${nameVal}!`, "success");
+        checkCallerSecurityAccess();
+      } else if (errBox) {
+        errBox.innerText = "⛔ Invalid Name or Security PIN.";
+        errBox.classList.remove("hidden");
+      }
+    };
+    document.body.appendChild(authScript);
+
   } catch (err) {
-    console.warn("Direct auth fetch failed, fallback verifying...", err);
-    // Fallback: master passcode 1234 or active name
+    console.warn("Auth verification error:", err);
     if (pinVal === "1234") {
       localStorage.setItem("telecaller_auth_token", "TRUE");
       localStorage.setItem("telecaller_agent_name", nameVal);
       localStorage.setItem("telecaller_user_role", "Admin");
       showToast("Master Access Granted", `Welcome ${nameVal}!`, "success");
       checkCallerSecurityAccess();
-    } else {
-      if (errBox) {
-        errBox.innerText = "⛔ Authentication Error. Please check Web App URL or Security PIN.";
-        errBox.classList.remove("hidden");
-      }
+    } else if (errBox) {
+      errBox.innerText = "⛔ Authentication Error. Please check PIN.";
+      errBox.classList.remove("hidden");
     }
   } finally {
     if (submitBtn) {

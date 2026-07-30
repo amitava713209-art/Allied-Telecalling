@@ -332,6 +332,67 @@ function doGet(e) {
     
     // Automatically find the sheet tab that contains the telecaller logs (Self-Healing)
     var sheet = findLogsSheet(ss);
+
+    // --- GET USER AUTH & PIN VERIFICATION HANDLER ---
+    if (e && e.parameter && e.parameter.action === "verify_user") {
+      var userSheet = ss.getSheetByName("Users");
+      if (!userSheet) {
+        userSheet = ss.insertSheet("Users");
+        userSheet.appendRow(["Caller Name", "PIN", "Status", "Role", "Bound Device ID", "Last Login"]);
+        userSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
+        userSheet.appendRow(["Admin", "1234", "Active", "Admin", "", ""]);
+      }
+      
+      var uData = userSheet.getDataRange().getValues();
+      var reqPin = String(e.parameter.pin || "").trim();
+      var reqName = String(e.parameter.name || "").trim().toLowerCase();
+      var reqDeviceId = String(e.parameter.deviceId || "").trim();
+      var foundUserRow = -1;
+      var foundUser = null;
+      
+      for (var u = 1; u < uData.length; u++) {
+        var uName = String(uData[u][0] || "").trim().toLowerCase();
+        var uPin = String(uData[u][1] || "").trim();
+        var uStatus = String(uData[u][2] || "").trim();
+        var uRole = String(uData[u][3] || "").trim();
+        var uBoundDevice = String(uData[u][4] || "").trim();
+        
+        if ((uName === reqName || !reqName) && uPin === reqPin) {
+          foundUserRow = u + 1;
+          foundUser = { name: uData[u][0], status: uStatus, role: uRole, boundDevice: uBoundDevice };
+          break;
+        }
+      }
+      
+      var resObj = {};
+      if (foundUser) {
+        if (foundUser.status.toLowerCase() !== "active") {
+          resObj = { status: "error", authorized: false, message: "Account Revoked. Please contact Admin." };
+          logAudit(ss, foundUser.name, "BLOCKED_LOGIN", "Attempted login on revoked account.");
+        } else if (foundUser.boundDevice && reqDeviceId && foundUser.boundDevice !== reqDeviceId && foundUser.role !== "Admin") {
+          resObj = { status: "error", authorized: false, message: "⛔ Unauthorized Device! Your PIN is bound to another phone. Contact Admin." };
+          logAudit(ss, foundUser.name, "UNAUTHORIZED_DEVICE", "Login rejected! PIN used on unauthorized device: " + reqDeviceId);
+        } else {
+          if (!foundUser.boundDevice && reqDeviceId && foundUserRow !== -1) {
+            userSheet.getRange(foundUserRow, 5).setValue(reqDeviceId);
+          }
+          if (foundUserRow !== -1) {
+            userSheet.getRange(foundUserRow, 6).setValue(new Date());
+          }
+          resObj = { status: "success", authorized: true, name: foundUser.name, role: foundUser.role };
+          logAudit(ss, foundUser.name, "LOGIN", "Logged into app successfully.");
+        }
+      } else {
+        resObj = { status: "error", authorized: false, message: "Invalid Name or Security PIN." };
+        logAudit(ss, reqName || "Unknown", "FAILED_LOGIN", "Failed PIN attempt.");
+      }
+
+      if (e.parameter.callback) {
+        return ContentService.createTextOutput(e.parameter.callback + "(" + JSON.stringify(resObj) + ")")
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(JSON.stringify(resObj)).setMimeType(ContentService.MimeType.JSON);
+    }
     
     // Check if request is to pull central Lead Queue
     if (e && e.parameter && e.parameter.action === "fetch_queue") {
