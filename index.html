@@ -315,35 +315,35 @@
         </form>
       </section>
 
-      <!-- Right Column: Call History Table & Lead Import Queue -->
-      <section class="table-panel animate-slide-left" id="table-panel-section">
-        <!-- Excel Lead Import & Calling Queue Card -->
-        <div class="lead-queue-panel">
-          <div class="lead-queue-header">
-            <div class="queue-title">
-              <i data-lucide="file-spreadsheet" class="indigo-text"></i>
-              <h3>Import Leads & Call Queue</h3>
-              <span id="queue-badge-count" class="queue-badge">0 Loaded</span>
-            </div>
-            <div class="queue-actions">
-              <label for="excel-file-input" class="btn-soft btn-upload-excel">
-                <i data-lucide="upload-cloud"></i> Upload Excel / CSV
-              </label>
-              <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)" style="display:none;">
-              <button type="button" class="btn-soft" onclick="clearLeadQueue()" title="Clear Queue List">
-                <i data-lucide="trash-2"></i> Clear Queue
-              </button>
-            </div>
+      <!-- Center Column: Excel Lead Import & Calling Queue Card -->
+      <section class="lead-queue-panel animate-slide-left" id="lead-queue-panel-section" style="background:#ffffff; border-radius:var(--radius-lg); border:1px solid var(--border-color); padding:1.25rem; margin-bottom:1rem; box-shadow:var(--shadow-sm);">
+        <div class="lead-queue-header">
+          <div class="queue-title">
+            <i data-lucide="file-spreadsheet" class="indigo-text"></i>
+            <h3>Import Leads & Call Queue</h3>
+            <span id="queue-badge-count" class="queue-badge">0 Loaded</span>
           </div>
-          <div id="lead-queue-container" class="lead-queue-container">
+          <div class="queue-actions">
+            <label for="excel-file-input" class="btn-soft btn-upload-excel">
+              <i data-lucide="upload-cloud"></i> Upload Excel / CSV
+            </label>
+            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)" style="display:none;">
+            <button type="button" class="btn-soft" onclick="clearLeadQueue()" title="Clear Queue List">
+              <i data-lucide="trash-2"></i> Clear Queue
+            </button>
+          </div>
+        </div>
+        <div id="lead-queue-container" class="lead-queue-container">
             <div class="empty-queue-hint">
               <i data-lucide="upload" style="width:22px; height:22px; color:#94a3b8;"></i>
               <span>Upload an Excel/CSV lead file to auto-populate numbers into your calling queue. Click any lead to load it directly into the form!</span>
             </div>
           </div>
-        </div>
+      </section>
 
-        <div class="panel-header-row" style="margin-top: 1.25rem;">
+      <!-- Right Column: Call History Table -->
+      <section class="table-panel animate-slide-left" id="table-panel-section">
+        <div class="panel-header-row">
           <div class="panel-header">
             <i data-lucide="list-checks"></i>
             <h2>Team Calling History</h2>
