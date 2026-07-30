@@ -2102,11 +2102,19 @@ async function handleCallerLogin(event) {
   }
   if (errBox) errBox.classList.add("hidden");
 
+  // Retrieve or generate persistent unique Device Hardware Fingerprint ID
+  let deviceId = localStorage.getItem("telecaller_device_id");
+  if (!deviceId) {
+    deviceId = "dev_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now();
+    localStorage.setItem("telecaller_device_id", deviceId);
+  }
+
   try {
     const postData = {
       action: "verify_user",
       name: nameVal,
-      pin: pinVal
+      pin: pinVal,
+      deviceId: deviceId
     };
 
     const response = await fetch(sheetUrl, {

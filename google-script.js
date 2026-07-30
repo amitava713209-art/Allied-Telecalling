@@ -37,19 +37,21 @@ function doPost(e) {
       data = e.parameter;
     }
 
-    // --- USER AUTH & PIN VERIFICATION HANDLER ---
+    // --- USER AUTH & PIN VERIFICATION HANDLER (WITH DEVICE HARDWARE BINDING) ---
     if (data && data.action === "verify_user") {
       var userSheet = ss.getSheetByName("Users");
       if (!userSheet) {
         userSheet = ss.insertSheet("Users");
-        userSheet.appendRow(["Caller Name", "PIN", "Status", "Role"]);
-        userSheet.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
-        userSheet.appendRow(["Admin", "1234", "Active", "Admin"]);
+        userSheet.appendRow(["Caller Name", "PIN", "Status", "Role", "Bound Device ID", "Last Login"]);
+        userSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
+        userSheet.appendRow(["Admin", "1234", "Active", "Admin", "", ""]);
       }
       
       var uData = userSheet.getDataRange().getValues();
       var reqPin = String(data.pin || "").trim();
       var reqName = String(data.name || "").trim().toLowerCase();
+      var reqDeviceId = String(data.deviceId || "").trim();
+      var foundUserRow = -1;
       var foundUser = null;
       
       for (var u = 1; u < uData.length; u++) {
@@ -57,12 +59,15 @@ function doPost(e) {
         var uPin = String(uData[u][1] || "").trim();
         var uStatus = String(uData[u][2] || "").trim();
         var uRole = String(uData[u][3] || "").trim();
+        var uBoundDevice = String(uData[u][4] || "").trim();
         
         if ((uName === reqName || !reqName) && uPin === reqPin) {
+          foundUserRow = u + 1; // 1-indexed row number
           foundUser = {
             name: uData[u][0],
             status: uStatus,
-            role: uRole
+            role: uRole,
+            boundDevice: uBoundDevice
           };
           break;
         }
@@ -70,16 +75,28 @@ function doPost(e) {
       
       var resObj = {};
       if (foundUser) {
-        if (foundUser.status.toLowerCase() === "active") {
-          resObj = { status: "success", authorized: true, name: foundUser.name, role: foundUser.role };
-          logAudit(ss, foundUser.name, "LOGIN", "Logged into application successfully.");
-        } else {
+        if (foundUser.status.toLowerCase() !== "active") {
           resObj = { status: "error", authorized: false, message: "Account Revoked. Please contact Admin." };
-          logAudit(ss, foundUser.name, "BLOCKED_LOGIN", "Attempted login on revoked account.");
+          logAudit(ss, foundUser.name, "BLOCKED_LOGIN", "Attempted login on revoked account from device: " + reqDeviceId);
+        } else if (foundUser.boundDevice && reqDeviceId && foundUser.boundDevice !== reqDeviceId && foundUser.role !== "Admin") {
+          // Device Mismatch Lockout!
+          resObj = { status: "error", authorized: false, message: "⛔ Unauthorized Device! Your PIN is bound to another phone. Contact Admin." };
+          logAudit(ss, foundUser.name, "UNAUTHORIZED_DEVICE", "Login rejected! PIN used on unauthorized device: " + reqDeviceId + " (Bound: " + foundUser.boundDevice + ")");
+        } else {
+          // Bind device on first successful login if empty
+          if (!foundUser.boundDevice && reqDeviceId && foundUserRow !== -1) {
+            userSheet.getRange(foundUserRow, 5).setValue(reqDeviceId);
+          }
+          if (foundUserRow !== -1) {
+            userSheet.getRange(foundUserRow, 6).setValue(new Date());
+          }
+          
+          resObj = { status: "success", authorized: true, name: foundUser.name, role: foundUser.role };
+          logAudit(ss, foundUser.name, "LOGIN", "Logged into app successfully from device: " + reqDeviceId);
         }
       } else {
         resObj = { status: "error", authorized: false, message: "Invalid Name or Security PIN." };
-        logAudit(ss, reqName || "Unknown", "FAILED_LOGIN", "Failed PIN authentication attempt.");
+        logAudit(ss, reqName || "Unknown", "FAILED_LOGIN", "Failed PIN attempt from device: " + reqDeviceId);
       }
       
       return ContentService.createTextOutput(JSON.stringify(resObj)).setMimeType(ContentService.MimeType.JSON);
