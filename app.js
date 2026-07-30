@@ -24,6 +24,9 @@ let editingRecordId = null;
 
 // --- Initialization on DOM Load ---
 document.addEventListener("DOMContentLoaded", () => {
+  // 0. Check Security Access Authentication
+  checkCallerSecurityAccess();
+
   // 1. Load data from LocalStorage
   loadStoredData();
   
@@ -2049,3 +2052,133 @@ window.addEventListener("resize", () => {
     if (historySection) historySection.style.display = "";
   }
 });
+
+// --- 🔒 SECURITY ACCESS & PIN AUTHENTICATION ENGINE ---
+function checkCallerSecurityAccess() {
+  const isAuth = localStorage.getItem("telecaller_auth_token") === "TRUE";
+  const callerName = localStorage.getItem("telecaller_agent_name");
+  const userRole = localStorage.getItem("telecaller_user_role") || "Caller";
+
+  const modal = document.getElementById("security-auth-modal");
+  const badgeName = document.getElementById("logged-user-name");
+  const agentInput = document.getElementById("caller-name");
+  const exportBtn = document.getElementById("export-csv-btn");
+
+  if (!isAuth || !callerName) {
+    if (modal) modal.classList.remove("hidden-modal");
+    if (badgeName) badgeName.innerText = "Locked";
+  } else {
+    if (modal) modal.classList.add("hidden-modal");
+    if (badgeName) badgeName.innerText = callerName + (userRole === "Admin" ? " (Admin)" : "");
+    if (agentInput) agentInput.value = callerName;
+
+    // Lock Bulk CSV Export button for Non-Admin Callers to prevent lead theft!
+    if (exportBtn) {
+      if (userRole !== "Admin") {
+        exportBtn.style.display = "none";
+      } else {
+        exportBtn.style.display = "inline-flex";
+      }
+    }
+  }
+}
+
+async function handleCallerLogin(event) {
+  event.preventDefault();
+  const nameInput = document.getElementById("auth-caller-name");
+  const pinInput = document.getElementById("auth-caller-pin");
+  const errBox = document.getElementById("auth-error-msg");
+  const submitBtn = document.getElementById("auth-submit-btn");
+
+  const nameVal = nameInput ? nameInput.value.trim() : "";
+  const pinVal = pinInput ? pinInput.value.trim() : "";
+
+  if (!nameVal || !pinVal) return;
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0;"></i> Verifying Security PIN...`;
+    if (window.lucide) window.lucide.createIcons();
+  }
+  if (errBox) errBox.classList.add("hidden");
+
+  try {
+    const postData = {
+      action: "verify_user",
+      name: nameVal,
+      pin: pinVal
+    };
+
+    const response = await fetch(sheetUrl, {
+      method: "POST",
+      mode: "cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(postData)
+    });
+
+    let res = null;
+    if (response.ok) {
+      res = await response.json();
+    }
+
+    if (res && res.status === "success" && res.authorized) {
+      localStorage.setItem("telecaller_auth_token", "TRUE");
+      localStorage.setItem("telecaller_agent_name", res.name || nameVal);
+      localStorage.setItem("telecaller_user_role", res.role || "Caller");
+
+      showToast("Access Granted", `Welcome ${res.name}! System unlocked.`, "success");
+      checkCallerSecurityAccess();
+      fetchRemoteLogs();
+      fetchCentralLeadQueue();
+    } else {
+      const msg = (res && res.message) ? res.message : "Invalid Name or Security PIN.";
+      if (errBox) {
+        errBox.innerText = "⛔ " + msg;
+        errBox.classList.remove("hidden");
+      }
+    }
+  } catch (err) {
+    console.warn("Direct auth fetch failed, fallback verifying...", err);
+    // Fallback: master passcode 1234 or active name
+    if (pinVal === "1234") {
+      localStorage.setItem("telecaller_auth_token", "TRUE");
+      localStorage.setItem("telecaller_agent_name", nameVal);
+      localStorage.setItem("telecaller_user_role", "Admin");
+      showToast("Master Access Granted", `Welcome ${nameVal}!`, "success");
+      checkCallerSecurityAccess();
+    } else {
+      if (errBox) {
+        errBox.innerText = "⛔ Authentication Error. Please check Web App URL or Security PIN.";
+        errBox.classList.remove("hidden");
+      }
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  }
+}
+
+function logoutCaller() {
+  if (confirm("Are you sure you want to lock and log out of the Telecaller portal?")) {
+    const callerName = localStorage.getItem("telecaller_agent_name") || "Caller";
+    localStorage.removeItem("telecaller_auth_token");
+    localStorage.removeItem("telecaller_agent_name");
+    localStorage.removeItem("telecaller_user_role");
+    
+    // Log Security Audit Logout
+    try {
+      fetch(sheetUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "log_audit", callerName: callerName, eventType: "LOGOUT", details: "User logged out." })
+      });
+    } catch(e){}
+
+    checkCallerSecurityAccess();
+    showToast("Locked", "Logged out successfully.", "info");
+  }
+}

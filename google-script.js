@@ -37,6 +37,62 @@ function doPost(e) {
       data = e.parameter;
     }
 
+    // --- USER AUTH & PIN VERIFICATION HANDLER ---
+    if (data && data.action === "verify_user") {
+      var userSheet = ss.getSheetByName("Users");
+      if (!userSheet) {
+        userSheet = ss.insertSheet("Users");
+        userSheet.appendRow(["Caller Name", "PIN", "Status", "Role"]);
+        userSheet.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
+        userSheet.appendRow(["Master Admin", "1234", "Active", "Admin"]);
+        userSheet.appendRow(["Moupriya", "1024", "Active", "Caller"]);
+        userSheet.appendRow(["Pankaj", "2048", "Active", "Caller"]);
+      }
+      
+      var uData = userSheet.getDataRange().getValues();
+      var reqPin = String(data.pin || "").trim();
+      var reqName = String(data.name || "").trim().toLowerCase();
+      var foundUser = null;
+      
+      for (var u = 1; u < uData.length; u++) {
+        var uName = String(uData[u][0] || "").trim().toLowerCase();
+        var uPin = String(uData[u][1] || "").trim();
+        var uStatus = String(uData[u][2] || "").trim();
+        var uRole = String(uData[u][3] || "").trim();
+        
+        if ((uName === reqName || !reqName) && uPin === reqPin) {
+          foundUser = {
+            name: uData[u][0],
+            status: uStatus,
+            role: uRole
+          };
+          break;
+        }
+      }
+      
+      var resObj = {};
+      if (foundUser) {
+        if (foundUser.status.toLowerCase() === "active") {
+          resObj = { status: "success", authorized: true, name: foundUser.name, role: foundUser.role };
+          logAudit(ss, foundUser.name, "LOGIN", "Logged into application successfully.");
+        } else {
+          resObj = { status: "error", authorized: false, message: "Account Revoked. Please contact Admin." };
+          logAudit(ss, foundUser.name, "BLOCKED_LOGIN", "Attempted login on revoked account.");
+        }
+      } else {
+        resObj = { status: "error", authorized: false, message: "Invalid Name or Security PIN." };
+        logAudit(ss, reqName || "Unknown", "FAILED_LOGIN", "Failed PIN authentication attempt.");
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify(resObj)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // --- SECURITY AUDIT LOGGING HANDLER ---
+    if (data && data.action === "log_audit") {
+      logAudit(ss, data.callerName || "System", data.eventType || "ACTION", data.details || "");
+      return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // --- CENTRAL LEAD QUEUE IMPORT HANDLER ---
     if (data && data.action === "upload_queue" && data.leads) {
       var queueSheet = ss.getSheetByName("Lead Queue");
@@ -448,4 +504,19 @@ function findLogsSheet(ss) {
     }
   }
   return sheets[0]; // Fallback to the first sheet if none matched
+}
+
+// Helper function to record Security Audit Logs in Google Sheet
+function logAudit(ss, callerName, eventType, details) {
+  try {
+    var auditSheet = ss.getSheetByName("Security Audit Log");
+    if (!auditSheet) {
+      auditSheet = ss.insertSheet("Security Audit Log");
+      auditSheet.appendRow(["Timestamp", "Caller Name", "Event Type", "Details"]);
+      auditSheet.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#dc2626").setFontColor("#ffffff");
+    }
+    auditSheet.appendRow([new Date(), callerName, eventType, details]);
+  } catch(e) {
+    console.log("Could not write audit log:", e);
+  }
 }

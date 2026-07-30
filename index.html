@@ -46,6 +46,12 @@
           <i data-lucide="calendar"></i>
           <span id="current-date">May 22, 2026</span>
         </div>
+
+        <!-- Active Logged In Caller Badge -->
+        <div class="date-badge" id="user-badge" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;" title="Active Logged-in Caller">
+          <i data-lucide="user-check"></i>
+          <span id="logged-user-name">Caller Logged In</span>
+        </div>
         
         <!-- Google Sheet Sync Status Indicator Button -->
         <button id="sync-status-btn" class="status-badge state-connected" onclick="openSettings()">
@@ -56,6 +62,9 @@
 
         <button class="icon-btn" onclick="openSettings()" id="settings-btn" title="Google Sheets Setup">
           <i data-lucide="settings"></i>
+        </button>
+        <button class="icon-btn" onclick="logoutCaller()" title="Logout Caller Access" style="color:#dc2626;">
+          <i data-lucide="log-out"></i>
         </button>
       </div>
     </header>
@@ -614,6 +623,54 @@
 
       <div class="modal-footer">
         <button class="btn-primary" onclick="closeCallsAuditModal()">Close Audit Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       🔒 CALLER SECURITY AUTHENTICATION & LOGIN MODAL
+       ========================================================================== -->
+  <div class="modal-overlay hidden-modal" id="security-auth-modal" style="z-index: 99999; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);">
+    <div class="modal-container" style="max-width: 420px; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); border: 1px solid var(--border-color);">
+      <div class="modal-header" style="background: linear-gradient(135deg, #4f46e5, #3730a3); color: #ffffff; padding: 1.25rem 1.5rem; border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg);">
+        <div class="modal-header-title" style="display:flex; align-items:center; gap:0.65rem;">
+          <i data-lucide="shield-check" style="width:24px; height:24px; color:#60a5fa;"></i>
+          <h3 style="color:#ffffff; font-size:1.15rem; margin:0;">Caller Security Portal</h3>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding: 1.5rem;">
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem; line-height:1.4;">
+          Authorized telecaller access only. Please enter your Caller Agent Name and 4-digit Security PIN to unlock data access.
+        </p>
+
+        <form id="auth-login-form" onsubmit="handleCallerLogin(event)">
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label for="auth-caller-name" style="font-size:0.85rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:0.35rem;">
+              Caller Agent Name <span style="color:#dc2626;">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i data-lucide="user-check" class="input-icon"></i>
+              <input type="text" id="auth-caller-name" placeholder="e.g. Moupriya" required autocomplete="off" style="width:100%; padding:0.65rem 0.75rem 0.65rem 2.4rem; border-radius:var(--radius-md); border:1px solid var(--border-color);">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:1.25rem;">
+            <label for="auth-caller-pin" style="font-size:0.85rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:0.35rem;">
+              Security PIN <span style="color:#dc2626;">*</span>
+            </label>
+            <div class="input-wrapper">
+              <i data-lucide="lock" class="input-icon"></i>
+              <input type="password" id="auth-caller-pin" placeholder="Enter 4-digit PIN" required maxlength="10" autocomplete="off" style="width:100%; padding:0.65rem 0.75rem 0.65rem 2.4rem; border-radius:var(--radius-md); border:1px solid var(--border-color); font-size:1.1rem; letter-spacing:2px;">
+            </div>
+          </div>
+
+          <div id="auth-error-msg" class="hidden" style="background:#fee2e2; border:1px solid #fca5a5; color:#dc2626; font-size:0.82rem; padding:0.6rem; border-radius:var(--radius-md); margin-bottom:1rem; text-align:center; font-weight:600;"></div>
+
+          <button type="submit" id="auth-submit-btn" class="btn-primary" style="width:100%; padding:0.75rem; font-size:0.95rem; font-weight:700; border-radius:var(--radius-md); justify-content:center;">
+            <i data-lucide="key-round"></i> Unlock Access
+          </button>
+        </form>
       </div>
     </div>
   </div>
