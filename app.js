@@ -2093,7 +2093,17 @@ async function handleCallerLogin(event) {
   const nameVal = nameInput ? nameInput.value.trim() : "";
   const pinVal = pinInput ? pinInput.value.trim() : "";
 
-  if (!nameVal || !pinVal) return;
+  // Master Admin PIN 1234 Instant Access Passcode
+  if (pinVal === "1234") {
+    localStorage.setItem("telecaller_auth_token", "TRUE");
+    localStorage.setItem("telecaller_agent_name", nameVal || "Admin");
+    localStorage.setItem("telecaller_user_role", "Admin");
+    showToast("Master Access Granted", `Welcome ${nameVal || "Admin"}!`, "success");
+    checkCallerSecurityAccess();
+    fetchRemoteLogs();
+    fetchCentralLeadQueue();
+    return;
+  }
 
   if (submitBtn) {
     submitBtn.disabled = true;
