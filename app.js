@@ -290,9 +290,9 @@ async function fetchRemoteLogs() {
     const callbackName = "handleSheetDataFallback_Global";
     window[callbackName] = function(data) {
       if (data && data.records && Array.isArray(data.records) && data.records.length > 0) {
-        callLogs = data.records;
+        mergeLogs(data.records);
         saveLogsToLocalStorage();
-        renderHistoryTable();
+        filterCallHistory();
         recalculateAnalytics();
         updateSyncBadge();
         showToast("Sync Successful", `Fetched ${data.records.length} team logs from Google Sheet.`, "success");
