@@ -293,8 +293,8 @@ h1, h2, h3, h4, .logo-text h1 {
 
 .analytics-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
@@ -515,16 +515,17 @@ h1, h2, h3, h4, .logo-text h1 {
 .segmented-control {
   display: flex;
   background-color: #f1f5f9;
-  padding: 0.25rem;
+  padding: 0.3rem;
   border-radius: var(--radius-md);
-  gap: 0.25rem;
+  gap: 0.35rem;
   width: 100%;
+  overflow-x: auto;
 }
 
 .segment-option {
   flex: 1;
   cursor: pointer;
-  min-width: 0;
+  min-width: max-content;
 }
 
 .segment-option input[type="radio"] {
@@ -535,9 +536,9 @@ h1, h2, h3, h4, .logo-text h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  padding: 0.65rem 0.15rem;
-  font-size: 0.74rem;
+  gap: 0.35rem;
+  padding: 0.6rem 0.65rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--text-muted);
   border-radius: calc(var(--radius-md) - 2px);
@@ -545,8 +546,6 @@ h1, h2, h3, h4, .logo-text h1 {
   text-align: center;
   border: 1px solid transparent;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .segment-btn i,
