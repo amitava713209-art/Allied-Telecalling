@@ -68,9 +68,9 @@ document.addEventListener("DOMContentLoaded", () => {
     window.lucide.createIcons();
   }
 
-  // 8. Initialize Mobile Layout Tab display
+  // 8. Initialize Mobile Layout Tab display (Default to Lead Queue on Mobile)
   if (window.innerWidth <= 768) {
-    switchMobileTab('form');
+    switchMobileTab('queue');
   }
 });
 
