@@ -1999,11 +1999,9 @@ function closeCallsAuditModal() {
 
 // --- 📱 MOBILE TAB SWITCHER ENGINE ---
 function switchMobileTab(tabName) {
-  if (window.innerWidth > 768) return;
-
-  const queueSection = document.querySelector(".lead-queue-panel");
+  const queueSection = document.getElementById("lead-queue-panel-section") || document.querySelector(".lead-queue-panel");
   const formSection = document.getElementById("form-panel-section");
-  const historySection = document.querySelector(".table-panel");
+  const historySection = document.getElementById("table-panel-section") || document.querySelector(".table-panel");
 
   const btnQueue = document.getElementById("nav-btn-queue");
   const btnForm = document.getElementById("nav-btn-form");
