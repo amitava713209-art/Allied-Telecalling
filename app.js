@@ -72,6 +72,13 @@ document.addEventListener("DOMContentLoaded", () => {
   if (window.innerWidth <= 768) {
     switchMobileTab('queue');
   }
+
+  // 9. Register PWA Service Worker for Mobile Installation
+  if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Allied Telecalling PWA Service Worker Registered:', reg.scope))
+      .catch(err => console.warn('PWA Registration failed:', err));
+  }
 });
 
 // Handle window resizing to switch between table and cards layout
