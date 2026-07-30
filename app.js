@@ -1707,7 +1707,9 @@ function renderLeadQueue() {
   }
 
   let html = `<div class="queue-list-grid">`;
-  leadQueue.forEach(lead => {
+  // Limit DOM rendering to first 100 items for 0ms instant page load speed
+  const visibleLeads = leadQueue.slice(0, 100);
+  visibleLeads.forEach(lead => {
     const isCalled = lead.status === "Called";
     const statusBadgeClass = isCalled ? "queue-status-called" : "queue-status-pending";
     const statusText = isCalled ? "Called" : "Pending";
