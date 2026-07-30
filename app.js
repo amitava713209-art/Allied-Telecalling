@@ -2233,3 +2233,87 @@ function logoutCaller() {
     showToast("Locked", "Logged out successfully.", "info");
   }
 }
+
+// --- ⚙️ SETTINGS MODAL HANDLERS ---
+function openSettings() {
+  const modal = document.getElementById("settings-modal");
+  const input = document.getElementById("web-app-url");
+  if (modal) {
+    modal.style.display = "flex";
+    modal.classList.remove("hidden-modal");
+  }
+  if (input) {
+    input.value = sheetUrl || DEFAULT_SHEET_URL;
+  }
+}
+
+function closeSettings() {
+  const modal = document.getElementById("settings-modal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden-modal");
+  }
+}
+
+function saveSettings() {
+  const input = document.getElementById("web-app-url");
+  if (input) {
+    const val = input.value.trim();
+    if (val) {
+      sheetUrl = val;
+      localStorage.setItem("telecaller_sheet_url", val);
+      showToast("Settings Saved", "Google Sheet URL configuration saved successfully.", "success");
+    }
+  }
+  closeSettings();
+  updateSyncBadge();
+}
+
+function testSheetConnection() {
+  const input = document.getElementById("web-app-url");
+  const statusEl = document.getElementById("test-conn-status");
+  const urlVal = input ? input.value.trim() : sheetUrl;
+
+  if (!urlVal) {
+    if (statusEl) {
+      statusEl.textContent = "URL Missing";
+      statusEl.className = "test-status-text error";
+    }
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.textContent = "Testing...";
+    statusEl.className = "test-status-text testing";
+  }
+
+  try {
+    const callbackName = "testSheetCB_" + Date.now();
+    window[callbackName] = function(data) {
+      if (statusEl) {
+        statusEl.textContent = "Connected!";
+        statusEl.className = "test-status-text success";
+      }
+      showToast("Connection Success", "Successfully connected to Google Sheet!", "success");
+      delete window[callbackName];
+    };
+
+    const testScript = document.createElement("script");
+    const testUrl = urlVal + (urlVal.includes("?") ? "&" : "?") + "callback=" + callbackName + "&_t=" + Date.now();
+    testScript.src = testUrl;
+    testScript.onload = () => testScript.remove();
+    testScript.onerror = () => {
+      testScript.remove();
+      if (statusEl) {
+        statusEl.textContent = "Connection Failed";
+        statusEl.className = "test-status-text error";
+      }
+    };
+    document.body.appendChild(testScript);
+  } catch (err) {
+    if (statusEl) {
+      statusEl.textContent = "Error";
+      statusEl.className = "test-status-text error";
+    }
+  }
+}
