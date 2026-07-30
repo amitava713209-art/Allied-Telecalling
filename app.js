@@ -1001,9 +1001,13 @@ function renderHistoryTable(filteredLogs = null) {
       }
       const syncCell = `<td class="sync-col">${syncContent}</td>`;
 
+      const isHot = record.status === "Hot List";
       const actionCell = `
         <td>
           <div class="actions-cell">
+            <button class="btn-icon-only" onclick="toggleHotListRecord('${record.id}')" title="${isHot ? 'Remove from Hot List' : 'Mark as 🔥 Hot List'}" style="background:${isHot ? '#fee2e2' : '#f1f5f9'}; border:1px solid ${isHot ? '#fca5a5' : '#cbd5e1'}; border-radius:50%; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+              <i data-lucide="flame" style="width:14px; height:14px; color:${isHot ? '#dc2626' : '#64748b'};"></i>
+            </button>
             <button class="btn-icon-only btn-tbl-call" onclick="triggerClickToCall('${record.mobile}')" title="Call Native SIM Dialer">
               <i data-lucide="phone-call" style="width:14px; height:14px;"></i>
             </button>
