@@ -15,6 +15,20 @@
  * 6. Copy the "Web app URL" (ends in "/exec") and paste it in app.js as DEFAULT_SHEET_URL.
  */
 
+function logAudit(ss, callerName, eventType, details) {
+  try {
+    var auditSheet = ss.getSheetByName("Security Audit Log");
+    if (!auditSheet) {
+      auditSheet = ss.insertSheet("Security Audit Log");
+      auditSheet.appendRow(["Timestamp", "Caller Name", "Event Type", "Details"]);
+      auditSheet.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#dc2626").setFontColor("#ffffff");
+    }
+    auditSheet.appendRow([new Date(), callerName, eventType, details]);
+  } catch(e) {
+    console.log("Could not write audit log:", e);
+  }
+}
+
 function doPost(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();

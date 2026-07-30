@@ -17,7 +17,7 @@ let recordingSeconds = 0;
 // Paste your deployed Google Apps Script Web App URL (ending in "/exec") inside the quotes below.
 // Once you paste your URL here, none of your 10 callers need to configure anything!
 // They will open the link and instantly see "Sheets Connected" automatically.
-const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbwsCT354fl29f5NHhxfxtwysXnWEDj7anq0emRs8XWoDTqlyR9j1Idob7_kcBXJWgBQHg/exec";
+const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbzi95qPF66gQ97cFCnvnezJdUepq0l8krznJTdhOajXGfqZXrFwwizVOdkQNAY8s-fafg/exec";
 
 let sheetUrl = DEFAULT_SHEET_URL;
 let editingRecordId = null;
