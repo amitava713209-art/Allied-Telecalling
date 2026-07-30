@@ -44,9 +44,7 @@ function doPost(e) {
         userSheet = ss.insertSheet("Users");
         userSheet.appendRow(["Caller Name", "PIN", "Status", "Role"]);
         userSheet.getRange(1, 1, 1, 4).setFontWeight("bold").setBackground("#4f46e5").setFontColor("#ffffff");
-        userSheet.appendRow(["Master Admin", "1234", "Active", "Admin"]);
-        userSheet.appendRow(["Moupriya", "1024", "Active", "Caller"]);
-        userSheet.appendRow(["Pankaj", "2048", "Active", "Caller"]);
+        userSheet.appendRow(["Admin", "1234", "Active", "Admin"]);
       }
       
       var uData = userSheet.getDataRange().getValues();
