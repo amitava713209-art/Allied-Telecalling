@@ -1666,9 +1666,19 @@ function mergeLeadQueue(remoteQueue) {
   if (!remoteQueue || !Array.isArray(remoteQueue) || remoteQueue.length === 0) return;
   const map = new Map();
   // Add remote queue items first so fresh central leads overwrite stale local cache
-  remoteQueue.forEach(item => {
+  remoteQueue.forEach((item, idx) => {
     if (item && item.mobile) {
-      map.set(item.mobile, item);
+      const mob = String(item.mobile).replace(/[^0-9]/g, "");
+      const cleanItem = {
+        id: item.id || `lead_remote_${idx}_${Date.now()}`,
+        name: item.name || `Lead ${idx + 1}`,
+        mobile: mob,
+        age: item.age || "",
+        gender: item.gender || "",
+        city: item.city || "",
+        status: item.status || "Pending"
+      };
+      map.set(mob, cleanItem);
     }
   });
   // Preserve any local call status updates
