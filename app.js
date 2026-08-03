@@ -1639,6 +1639,9 @@ async function fetchCentralLeadQueue() {
         mergeLeadQueue(data.queue);
         saveLeadQueueToLocalStorage();
         renderLeadQueue();
+        if (window.innerWidth <= 768) {
+          switchMobileTab('queue');
+        }
         showToast("Leads Updated", `Loaded ${data.queue.length} central leads!`, "success");
       }
       delete window[callbackName];
