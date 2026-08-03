@@ -1712,6 +1712,12 @@ function renderLeadQueue() {
   const badge = document.getElementById("queue-badge-count");
   if (!container) return;
 
+  const queuePanel = document.getElementById("lead-queue-panel-section") || document.querySelector(".lead-queue-panel");
+  if (queuePanel && window.innerWidth <= 768) {
+    queuePanel.classList.remove("mobile-tab-hidden");
+    queuePanel.style.display = "block";
+  }
+
   if (badge) {
     const pendingCount = leadQueue.filter(l => l.status === "Pending").length;
     badge.textContent = `${pendingCount} / ${leadQueue.length} Pending`;
