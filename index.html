@@ -484,7 +484,7 @@
     </main>
 
     <!-- Mobile Bottom Tab Navigation -->
-    <div class="mobile-nav-bar">
+    <div class="mobile-nav-bar" style="display:grid; grid-template-columns:repeat(4, 1fr);">
       <button class="mobile-nav-item active" id="nav-btn-queue" onclick="switchMobileTab('queue')">
         <i data-lucide="upload"></i>
         <span>Lead Queue</span>
@@ -496,6 +496,10 @@
       <button class="mobile-nav-item" id="nav-btn-history" onclick="switchMobileTab('history')">
         <i data-lucide="list-checks"></i>
         <span>Team History</span>
+      </button>
+      <button class="mobile-nav-item" id="nav-btn-sync" onclick="fetchRemoteLogs(); fetchCentralLeadQueue();" style="color:var(--primary);">
+        <i data-lucide="refresh-cw"></i>
+        <span>Sync Data</span>
       </button>
     </div>
   </div>
