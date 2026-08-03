@@ -1593,15 +1593,22 @@ function handleExcelUpload(event) {
         return;
       }
 
-      // ✅ REPLACE — not append. Admin uploading always replaces the full list.
-      leadQueue = newQueue;
+      // New leads go to TOP — old leads stay below. Deduplicate by mobile number.
+      const existingMobiles = new Set(leadQueue.map(l => String(l.mobile)));
+      const dedupedNew = newQueue.filter(l => !existingMobiles.has(String(l.mobile)));
+      const skipped = parsedCount - dedupedNew.length;
+
+      leadQueue = [...dedupedNew, ...leadQueue];   // ← new at top, old preserved below
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
 
-      // Push to Google Sheets so all callers see the new list
-      syncCentralLeadQueue(newQueue);
+      // Push new leads to Google Sheets (merge mode — keeps old leads for callers)
+      syncCentralLeadQueue(dedupedNew, false);
 
-      showToast("✅ Leads Uploaded", `${parsedCount} leads loaded. Callers will see them after Sync.`, "success");
+      const msg = skipped > 0
+        ? `${dedupedNew.length} new leads added to top. ${skipped} duplicates skipped.`
+        : `${dedupedNew.length} Doctor leads added to the top of the queue!`;
+      showToast("✅ Leads Uploaded", msg, "success");
 
 
     } catch (err) {
@@ -1615,8 +1622,8 @@ function handleExcelUpload(event) {
   reader.readAsArrayBuffer(file);
 }
 
-async function syncCentralLeadQueue(newLeads) {
-  if (!sheetUrl) return;
+async function syncCentralLeadQueue(newLeads, replace = false) {
+  if (!sheetUrl || !newLeads || newLeads.length === 0) return;
   try {
     await fetch(sheetUrl, {
       method: "POST",
@@ -1624,15 +1631,16 @@ async function syncCentralLeadQueue(newLeads) {
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         action: "upload_queue",
-        replace: true,          // ← tells Google Script to CLEAR old queue first
+        replace: replace,    // true = clear old leads first, false = add new leads alongside old
         leads: newLeads
       })
     });
-    console.log(`Central lead queue uploaded: ${newLeads.length} leads (replace mode).`);
+    console.log(`Lead queue synced: ${newLeads.length} leads (replace=${replace}).`);
   } catch (err) {
     console.warn("Could not sync central lead queue:", err);
   }
 }
+
 
 
 async function fetchCentralLeadQueue() {

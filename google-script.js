@@ -135,12 +135,29 @@ function doPost(e) {
         queueSheet.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
       }
 
-      // ✅ REPLACE MODE: If admin uploads fresh list, clear old rows first
+      // ✅ REPLACE MODE: Clear all old leads first (Admin explicitly chose full refresh)
       if (data.replace === true || data.replace === "true") {
         var lastDataRow = queueSheet.getLastRow();
         if (lastDataRow > 1) {
           queueSheet.deleteRows(2, lastDataRow - 1);
         }
+      } else {
+        // MERGE MODE (default): Skip leads whose mobile is already in the sheet
+        var existingData = queueSheet.getDataRange().getValues();
+        var existingMobiles = {};
+        for (var q = 1; q < existingData.length; q++) {
+          var m = existingData[q][2] ? existingData[q][2].toString().replace(/[^0-9]/g, "") : "";
+          if (m) existingMobiles[m] = true;
+        }
+        // Filter newRows to only NEW mobiles
+        data.leads = data.leads.filter(function(lead) {
+          var mobClean = lead.mobile ? lead.mobile.toString().replace(/[^0-9]/g, "") : "";
+          if (mobClean && !existingMobiles[mobClean]) {
+            existingMobiles[mobClean] = true;
+            return true;
+          }
+          return false;
+        });
       }
 
       var newRows = [];
