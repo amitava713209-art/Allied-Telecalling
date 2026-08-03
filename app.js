@@ -1660,15 +1660,19 @@ async function fetchCentralLeadQueue() {
 }
 
 function mergeLeadQueue(remoteQueue) {
+  if (!remoteQueue || !Array.isArray(remoteQueue) || remoteQueue.length === 0) return;
   const map = new Map();
-  leadQueue.forEach(item => map.set(item.mobile, item));
+  // Add remote queue items first so fresh central leads overwrite stale local cache
   remoteQueue.forEach(item => {
-    if (!map.has(item.mobile)) {
+    if (item && item.mobile) {
       map.set(item.mobile, item);
-    } else {
-      // If remote status is called, reflect called status
-      if (item.status === "Called") {
-        map.get(item.mobile).status = "Called";
+    }
+  });
+  // Preserve any local call status updates
+  leadQueue.forEach(item => {
+    if (item && item.mobile && map.has(item.mobile)) {
+      if (item.status === "Called" || item.status === "Hot List") {
+        map.get(item.mobile).status = item.status;
       }
     }
   });
