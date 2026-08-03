@@ -1,50 +1,63 @@
-// Service Worker for Allied Telecalling PWA
-const CACHE_NAME = 'allied-telecalling-v1';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './logo.png',
-  './manifest.json'
+/* Allied Telecalling PWA Service Worker
+   Version: 2.0 — Mobile-First Build */
+
+const CACHE_NAME = 'allied-call-v2';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/style.css',
+  '/app.js',
+  '/logo.png',
+  '/manifest.json',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+  'https://unpkg.com/lucide@latest'
 ];
 
+// Install: cache all static assets
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(STATIC_ASSETS).catch(err => {
+        console.warn('Some assets failed to cache:', err);
+      });
     })
   );
   self.skipWaiting();
 });
 
+// Activate: clean up old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    })
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      )
+    )
   );
   self.clients.claim();
 });
 
+// Fetch: network-first for Google Sheets API, cache-first for static assets
 self.addEventListener('fetch', event => {
-  // Network first, falling back to cache if offline
-  if (event.request.method !== 'GET') return;
+  const url = event.request.url;
+
+  // Always use network for Google Sheets / Script requests (live data)
+  if (url.includes('script.google.com') || url.includes('googleapis.com')) {
+    return; // Let it go to network directly
+  }
+
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, responseClone);
-        });
+    caches.match(event.request).then(cached => {
+      // Return cached version instantly, then refresh in background
+      const networkFetch = fetch(event.request).then(response => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
         return response;
-      })
-      .catch(() => caches.match(event.request))
+      }).catch(() => null);
+
+      return cached || networkFetch;
+    })
   );
 });

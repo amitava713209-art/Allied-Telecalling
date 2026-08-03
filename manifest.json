@@ -2,12 +2,13 @@
   "name": "Allied Telecaller Portal",
   "short_name": "Allied Call",
   "description": "Allied Services Daily Telecaller Tracking & Calling Portal",
-  "start_url": "https://alliedtelesuite.netlify.app/",
-  "id": "https://alliedtelesuite.netlify.app/",
+  "start_url": "https://allied-telecalling.vercel.app/",
+  "id": "https://allied-telecalling.vercel.app/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
   "orientation": "portrait",
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "logo.png",

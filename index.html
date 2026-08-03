@@ -355,8 +355,61 @@
      ============================================= -->
 <div id="toast-container" class="toast-container"></div>
 
+<!-- =============================================
+     📲 PWA INSTALL BANNER
+     ============================================= -->
+<div id="pwa-install-banner" class="pwa-banner hidden">
+  <img src="logo.png" alt="Allied" class="pwa-banner-logo">
+  <div class="pwa-banner-text">
+    <strong>Install Allied Calling</strong>
+    <span>Add to home screen for app experience</span>
+  </div>
+  <button class="pwa-install-btn" id="pwa-install-btn">Install</button>
+  <button class="pwa-dismiss-btn" id="pwa-dismiss-btn" title="Dismiss">✕</button>
+</div>
+
 <!-- Scripts -->
 <script src="app.js"></script>
+<script>
+// PWA Install Prompt Handler
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // Show install banner after 3 seconds if not already installed
+  setTimeout(() => {
+    const banner = document.getElementById('pwa-install-banner');
+    if (banner && !window.matchMedia('(display-mode: standalone)').matches) {
+      banner.classList.remove('hidden');
+    }
+  }, 3000);
+});
+
+document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+  const banner = document.getElementById('pwa-install-banner');
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') {
+      if (banner) banner.classList.add('hidden');
+    }
+    deferredInstallPrompt = null;
+  }
+});
+
+document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
+  const banner = document.getElementById('pwa-install-banner');
+  if (banner) banner.classList.add('hidden');
+  localStorage.setItem('pwa_banner_dismissed', 'true');
+});
+
+// Hide banner if already running as standalone PWA
+if (window.matchMedia('(display-mode: standalone)').matches) {
+  const banner = document.getElementById('pwa-install-banner');
+  if (banner) banner.classList.add('hidden');
+}
+</script>
 
 </body>
 </html>

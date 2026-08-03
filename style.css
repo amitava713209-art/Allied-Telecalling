@@ -1258,6 +1258,77 @@ button, input, select, textarea {
 .audit-name { font-weight: 700; color: #1e293b; }
 .audit-meta { color: #64748b; margin-top: 0.2rem; font-size: 0.75rem; }
 
+/* ---- PWA INSTALL BANNER ---- */
+.pwa-banner {
+  position: fixed;
+  bottom: 68px; /* sit just above the bottom nav */
+  left: 0.75rem;
+  right: 0.75rem;
+  background: #1e293b;
+  color: #fff;
+  border-radius: 16px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  z-index: 4000;
+  animation: slide-up 0.3s ease-out;
+}
+
+.pwa-banner.hidden { display: none !important; }
+
+.pwa-banner-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.pwa-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.pwa-banner-text strong {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.pwa-banner-text span {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.pwa-install-btn {
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.pwa-install-btn:active { opacity: 0.85; }
+
+.pwa-dismiss-btn {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.pwa-dismiss-btn:active { background: rgba(255,255,255,0.2); }
+
 /* ---- Desktop Layout Overrides ---- */
 @media (min-width: 769px) {
   html, body { overflow: auto; }
