@@ -128,22 +128,25 @@ function doPost(e) {
       if (!queueSheet) {
         queueSheet = ss.insertSheet("Lead Queue");
       }
+
+      // Write header row if sheet is empty
       if (queueSheet.getLastRow() === 0) {
-        queueSheet.appendRow(["ID", "Name", "Mobile Number", "Age", "Gender", "City", "Status"]);
-        queueSheet.getRange(1, 1, 1, 7).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
+        queueSheet.appendRow(["ID", "Name", "Mobile Number", "Age", "Gender", "City", "Category", "Status"]);
+        queueSheet.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
       }
-      
-      var existingData = queueSheet.getDataRange().getValues();
-      var existingMobiles = {};
-      for (var q = 1; q < existingData.length; q++) {
-        var m = existingData[q][2] ? existingData[q][2].toString().replace(/[^0-9]/g, "") : "";
-        if (m) existingMobiles[m] = true;
+
+      // ✅ REPLACE MODE: If admin uploads fresh list, clear old rows first
+      if (data.replace === true || data.replace === "true") {
+        var lastDataRow = queueSheet.getLastRow();
+        if (lastDataRow > 1) {
+          queueSheet.deleteRows(2, lastDataRow - 1);
+        }
       }
-      
+
       var newRows = [];
       data.leads.forEach(function(lead) {
         var mobClean = lead.mobile ? lead.mobile.toString().replace(/[^0-9]/g, "") : "";
-        if (mobClean && !existingMobiles[mobClean]) {
+        if (mobClean) {
           newRows.push([
             lead.id || ("lead_" + new Date().getTime() + "_" + Math.floor(Math.random()*1000)),
             lead.name || "Lead",
@@ -151,19 +154,19 @@ function doPost(e) {
             lead.age || "",
             lead.gender || "",
             lead.city || "",
+            lead.category || "",
             lead.status || "Pending"
           ]);
-          existingMobiles[mobClean] = true;
         }
       });
-      
+
       if (newRows.length > 0) {
-        queueSheet.getRange(queueSheet.getLastRow() + 1, 1, newRows.length, 7).setValues(newRows);
+        queueSheet.getRange(queueSheet.getLastRow() + 1, 1, newRows.length, 8).setValues(newRows);
       }
-      
+
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
-        message: "Successfully uploaded " + newRows.length + " new leads to central Lead Queue tab!"
+        message: "Uploaded " + newRows.length + " leads to Lead Queue (replace mode: " + (data.replace || false) + ")"
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
@@ -413,7 +416,9 @@ function doGet(e) {
       var qSheet = ss.getSheetByName("Lead Queue");
       var qList = [];
       if (qSheet && qSheet.getLastRow() > 1) {
-        var qValues = qSheet.getRange(2, 1, qSheet.getLastRow() - 1, 7).getValues();
+        var qLastCol = qSheet.getLastColumn();
+        var qValues = qSheet.getRange(2, 1, qSheet.getLastRow() - 1, qLastCol).getValues();
+        // Detect if Category column exists (col index 6, 0-based)
         qValues.forEach(function(r) {
           var mob = r[2] ? r[2].toString().replace(/[^0-9]/g, "") : "";
           if (mob) {
@@ -424,7 +429,8 @@ function doGet(e) {
               age: r[3] || "",
               gender: r[4] || "",
               city: r[5] || "",
-              status: r[6] || "Pending"
+              category: (qLastCol >= 8 && r[6]) ? r[6].toString() : "",  // col 6 = Category
+              status: (qLastCol >= 8 ? r[7] : r[6]) || "Pending"         // col 7 = Status
             });
           }
         });

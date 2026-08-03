@@ -1589,18 +1589,20 @@ function handleExcelUpload(event) {
       });
 
       if (parsedCount === 0) {
-        showToast("No Valid Numbers", "Could not find valid 10-digit mobile numbers in the file. Ensure headers are Name and Mobile.", "error");
+        showToast("No Valid Numbers", "Could not find valid 10-digit mobile numbers in the file.", "error");
         return;
       }
 
-      leadQueue = [...leadQueue, ...newQueue];
+      // ✅ REPLACE — not append. Admin uploading always replaces the full list.
+      leadQueue = newQueue;
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
-      
-      // Upload new leads to central Google Sheets Lead Queue tab
+
+      // Push to Google Sheets so all callers see the new list
       syncCentralLeadQueue(newQueue);
 
-      showToast("Excel Imported", `Loaded ${parsedCount} leads into Central Calling Queue!`, "success");
+      showToast("✅ Leads Uploaded", `${parsedCount} leads loaded. Callers will see them after Sync.`, "success");
+
 
     } catch (err) {
       console.error("Excel parse error:", err);
@@ -1622,14 +1624,16 @@ async function syncCentralLeadQueue(newLeads) {
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
         action: "upload_queue",
+        replace: true,          // ← tells Google Script to CLEAR old queue first
         leads: newLeads
       })
     });
-    console.log("Central lead queue uploaded to Google Sheets.");
+    console.log(`Central lead queue uploaded: ${newLeads.length} leads (replace mode).`);
   } catch (err) {
     console.warn("Could not sync central lead queue:", err);
   }
 }
+
 
 async function fetchCentralLeadQueue() {
   if (!sheetUrl) return;
