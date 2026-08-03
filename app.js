@@ -2019,6 +2019,10 @@ function switchMobileTab(tabName) {
   if (btnHistory) btnHistory.classList.remove("active");
   if (btnSync) btnSync.classList.remove("active");
 
+  if (queueSection) queueSection.style.display = "";
+  if (formSection) formSection.style.display = "";
+  if (historySection) historySection.style.display = "";
+
   if (tabName === 'queue') {
     if (queueSection) queueSection.classList.remove("mobile-tab-hidden");
     if (formSection) formSection.classList.add("mobile-tab-hidden");
