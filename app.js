@@ -1605,15 +1605,22 @@ async function handleExcelUpload(event) {
         return;
       }
 
-      // Replace lead queue with fresh uploaded file
-      leadQueue = newQueue;
+      // New leads go to TOP — old leads stay below. Deduplicate by mobile number.
+      const existingMobiles = new Set(leadQueue.map(l => String(l.mobile)));
+      const dedupedNew = newQueue.filter(l => !existingMobiles.has(String(l.mobile)));
+      const skipped = parsedCount - dedupedNew.length;
+
+      leadQueue = [...dedupedNew, ...leadQueue];   // ← new at top, old preserved below
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
 
-      // Push to Google Sheets (replace mode = true)
-      syncCentralLeadQueue(newQueue, true);
+      // Push new leads to Google Sheets (merge mode = false, so it adds to Sheets)
+      syncCentralLeadQueue(dedupedNew, false);
 
-      showToast("✅ Leads Uploaded", `${parsedCount} Doctor leads loaded into queue!`, "success");
+      const msg = skipped > 0
+        ? `${dedupedNew.length} new leads added to top. ${skipped} duplicates skipped.`
+        : `${dedupedNew.length} leads added to the top of the queue!`;
+      showToast("✅ Leads Added", msg, "success");
 
 
     } catch (err) {
