@@ -1530,7 +1530,7 @@ function handleExcelUpload(event) {
 
           if (["customer name", "name", "client name", "full name", "client", "customer", "lead name", "lead"].includes(cleanK)) {
             if (!name) name = val;
-          } else if (["mobile number", "mobile", "phone", "phone number", "contact", "contact number", "cell", "telephone", "mobile no", "phone no", "mob", "number"].includes(cleanK)) {
+          } else if (["mobile number", "mobile", "phone", "phone number", "contact", "contact number", "cell", "telephone", "mobile no", "phone no", "mobile_no", "mob", "number"].includes(cleanK)) {
             if (!mobileRaw) mobileRaw = val;
           } else if (["age", "customer age"].includes(cleanK)) {
             if (!age) age = val;
