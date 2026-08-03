@@ -484,10 +484,10 @@
     </main>
 
     <!-- Mobile Bottom Tab Navigation -->
-    <div class="mobile-nav-bar" style="display:grid; grid-template-columns:repeat(4, 1fr);">
+    <div class="mobile-nav-bar" style="display:grid; grid-template-columns:repeat(5, 1fr);">
       <button class="mobile-nav-item active" id="nav-btn-queue" onclick="switchMobileTab('queue')">
         <i data-lucide="upload"></i>
-        <span>Lead Queue</span>
+        <span>Queue</span>
       </button>
       <button class="mobile-nav-item" id="nav-btn-form" onclick="switchMobileTab('form')">
         <i data-lucide="edit-3"></i>
@@ -495,11 +495,15 @@
       </button>
       <button class="mobile-nav-item" id="nav-btn-history" onclick="switchMobileTab('history')">
         <i data-lucide="list-checks"></i>
-        <span>Team History</span>
+        <span>History</span>
       </button>
       <button class="mobile-nav-item" id="nav-btn-sync" onclick="switchMobileTab('queue'); fetchRemoteLogs(); fetchCentralLeadQueue();" style="color:var(--primary);">
         <i data-lucide="refresh-cw"></i>
-        <span>Sync Data</span>
+        <span>Sync</span>
+      </button>
+      <button class="mobile-nav-item" id="nav-btn-logout" onclick="logoutCaller()" style="color:#dc2626;">
+        <i data-lucide="log-out"></i>
+        <span>Lock</span>
       </button>
     </div>
   </div>
