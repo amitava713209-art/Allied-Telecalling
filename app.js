@@ -2008,10 +2008,13 @@ function switchMobileTab(tabName) {
   const btnForm = document.getElementById("nav-btn-form");
   const btnHistory = document.getElementById("nav-btn-history");
 
+  const btnSync = document.getElementById("nav-btn-sync");
+
   // Reset active buttons
   if (btnQueue) btnQueue.classList.remove("active");
   if (btnForm) btnForm.classList.remove("active");
   if (btnHistory) btnHistory.classList.remove("active");
+  if (btnSync) btnSync.classList.remove("active");
 
   if (tabName === 'queue') {
     if (queueSection) queueSection.classList.remove("mobile-tab-hidden");
