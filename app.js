@@ -2074,6 +2074,9 @@ function checkCallerSecurityAccess() {
         exportBtn.style.display = "inline-flex";
       }
     }
+
+    // Auto-fetch central lead queue as soon as user is unlocked
+    fetchCentralLeadQueue();
   }
 }
 
