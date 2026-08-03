@@ -99,6 +99,9 @@
         <input type="search" id="lead-search-input" class="search-box" placeholder="🔍 Search doctor name or number..." oninput="filterLeadQueue(this.value)">
         <div class="toolbar-actions">
           <span id="queue-badge-count" class="count-badge">0 Pending</span>
+          <button id="clear-queue-btn" type="button" class="upload-btn" onclick="clearLeadQueue()" title="Clear Lead Queue" style="background:#fee2e2; color:#dc2626; border-color:#fca5a5; display:none;">
+            <i data-lucide="trash-2"></i>
+          </button>
           <label for="excel-file-input" class="upload-btn" title="Upload Excel or CSV">
             <i data-lucide="upload-cloud"></i>
           </label>

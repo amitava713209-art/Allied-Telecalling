@@ -1593,22 +1593,15 @@ function handleExcelUpload(event) {
         return;
       }
 
-      // New leads go to TOP — old leads stay below. Deduplicate by mobile number.
-      const existingMobiles = new Set(leadQueue.map(l => String(l.mobile)));
-      const dedupedNew = newQueue.filter(l => !existingMobiles.has(String(l.mobile)));
-      const skipped = parsedCount - dedupedNew.length;
-
-      leadQueue = [...dedupedNew, ...leadQueue];   // ← new at top, old preserved below
+      // Replace lead queue with fresh uploaded file
+      leadQueue = newQueue;
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
 
-      // Push new leads to Google Sheets (merge mode — keeps old leads for callers)
-      syncCentralLeadQueue(dedupedNew, false);
+      // Push to Google Sheets (replace mode = true)
+      syncCentralLeadQueue(newQueue, true);
 
-      const msg = skipped > 0
-        ? `${dedupedNew.length} new leads added to top. ${skipped} duplicates skipped.`
-        : `${dedupedNew.length} Doctor leads added to the top of the queue!`;
-      showToast("✅ Leads Uploaded", msg, "success");
+      showToast("✅ Leads Uploaded", `${parsedCount} Doctor leads loaded into queue!`, "success");
 
 
     } catch (err) {
@@ -1711,12 +1704,12 @@ function saveLeadQueueToLocalStorage() {
 }
 
 function clearLeadQueue() {
-  if (leadQueue.length === 0) return;
   if (confirm("Are you sure you want to clear all imported leads from the queue?")) {
     leadQueue = [];
     saveLeadQueueToLocalStorage();
     renderLeadQueue();
-    showToast("Queue Cleared", "Imported leads queue cleared.", "info");
+    syncCentralLeadQueue([], true);
+    showToast("Queue Cleared", "All leads cleared from queue and Google Sheets.", "info");
   }
 }
 
@@ -2083,8 +2076,10 @@ function checkCallerSecurityAccess() {
     // Export CSV — Admin only
     if (exportBtn) exportBtn.style.display = isAdmin ? 'inline-flex' : 'none';
 
-    // Upload Excel — Admin only
+    // Upload & Clear buttons — Admin only
+    const clearBtn = document.getElementById('clear-queue-btn');
     if (uploadLabel) uploadLabel.style.display = isAdmin ? 'flex' : 'none';
+    if (clearBtn) clearBtn.style.display = isAdmin ? 'flex' : 'none';
     if (uploadInput) uploadInput.style.display = 'none'; // always hidden, triggered by label
 
     // Auto-silently fetch leads for ALL users on login
