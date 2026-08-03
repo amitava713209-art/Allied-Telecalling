@@ -1633,9 +1633,8 @@ async function syncCentralLeadQueue(newLeads) {
 async function fetchCentralLeadQueue() {
   if (!sheetUrl) return;
   try {
-    const callbackName = "handleCentralQueueFallback_" + Date.now();
-    window[callbackName] = function(data) {
-      if (data && data.status === "success" && data.queue) {
+    window.handleCentralQueueFallback_Global = function(data) {
+      if (data && data.status === "success" && data.queue && Array.isArray(data.queue)) {
         mergeLeadQueue(data.queue);
         saveLeadQueueToLocalStorage();
         renderLeadQueue();
@@ -1644,7 +1643,6 @@ async function fetchCentralLeadQueue() {
         }
         showToast("Leads Updated", `Loaded ${data.queue.length} central leads!`, "success");
       }
-      delete window[callbackName];
     };
 
     // Always use script tag injection (JSONP) for 100% reliable cross-origin loading on mobile browsers
@@ -1653,7 +1651,7 @@ async function fetchCentralLeadQueue() {
 
     const scriptTag = document.createElement("script");
     scriptTag.setAttribute("data-queue-script", "true");
-    scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue&callback=" + callbackName + "&_t=" + Date.now();
+    scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue&callback=handleCentralQueueFallback_Global&_t=" + Date.now();
     scriptTag.onload = () => scriptTag.remove();
     scriptTag.onerror = () => scriptTag.remove();
     document.body.appendChild(scriptTag);
