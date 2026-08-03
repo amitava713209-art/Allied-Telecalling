@@ -1519,6 +1519,7 @@ function handleExcelUpload(event) {
         let age = "";
         let gender = "";
         let city = "";
+        let category = "";
 
         // 1. Try finding explicit header matches first
         for (let k of rowKeys) {
@@ -1526,7 +1527,7 @@ function handleExcelUpload(event) {
           const val = String(row[k]).trim();
           if (!val) continue;
 
-          if (["customer name", "name", "client name", "full name", "client", "customer", "lead name", "lead"].includes(cleanK)) {
+          if (["customer name", "name", "client name", "full name", "client", "customer", "lead name", "lead", "doctor name", "doctor"].includes(cleanK)) {
             if (!name) name = val;
           } else if (["mobile number", "mobile", "phone", "phone number", "contact", "contact number", "cell", "telephone", "mobile no", "phone no", "mobile_no", "mob", "number"].includes(cleanK)) {
             if (!mobileRaw) mobileRaw = val;
@@ -1534,17 +1535,18 @@ function handleExcelUpload(event) {
             if (!age) age = val;
           } else if (["gender", "sex"].includes(cleanK)) {
             if (!gender) gender = val;
-          } else if (["city", "location", "address", "notes", "remarks"].includes(cleanK)) {
+          } else if (["city", "location", "area"].includes(cleanK)) {
             if (!city) city = val;
+          } else if (["category", "speciality", "specialization", "specialty", "type", "doctor type", "doc type", "segment"].includes(cleanK)) {
+            if (!category) category = val;
           }
         }
 
-        // 2. Ultra-smart fallback: If header name wasn't recognized, scan ALL cell values in this row for phone numbers!
+        // 2. Ultra-smart fallback: scan ALL cell values for phone numbers
         if (!mobileRaw) {
           for (let k of rowKeys) {
             const valStr = String(row[k]).trim();
             const cleanedVal = valStr.replace(/[^0-9]/g, "");
-            // If cell contains 10 to 13 digits, treat it as the mobile number!
             if (cleanedVal.length >= 10 && cleanedVal.length <= 13) {
               mobileRaw = valStr;
               break;
@@ -1552,7 +1554,7 @@ function handleExcelUpload(event) {
           }
         }
 
-        // 3. Fallback for Name: If name wasn't recognized, pick the first non-numeric text cell that isn't the phone number
+        // 3. Fallback for Name: pick first non-numeric text cell
         if (!name) {
           for (let k of rowKeys) {
             const valStr = String(row[k]).trim();
@@ -1579,6 +1581,7 @@ function handleExcelUpload(event) {
             age: age || "",
             gender: gender || "",
             city: city || "",
+            category: category || "",
             status: "Pending"
           });
           parsedCount++;
@@ -1633,13 +1636,14 @@ async function fetchCentralLeadQueue() {
   try {
     window.handleCentralQueueFallback_Global = function(data) {
       if (data && data.status === "success" && data.queue && Array.isArray(data.queue)) {
+        const wasEmpty = leadQueue.length === 0;
         mergeLeadQueue(data.queue);
         saveLeadQueueToLocalStorage();
         renderLeadQueue();
-        if (window.innerWidth <= 768) {
-          switchMobileTab('queue');
+        // Only show toast on first load; silent refresh otherwise
+        if (wasEmpty && data.queue.length > 0) {
+          showToast("Leads Ready", `${data.queue.length} Doctor leads loaded — start calling!`, "success");
         }
-        showToast("Leads Updated", `Loaded ${data.queue.length} central leads!`, "success");
       }
     };
 
@@ -1673,12 +1677,13 @@ function mergeLeadQueue(remoteQueue) {
         age: item.age || "",
         gender: item.gender || "",
         city: item.city || "",
+        category: item.category || "",   // ← preserve Category from Excel
         status: item.status || "Pending"
       };
       map.set(key, cleanItem);
     }
   });
-  // Preserve any local call status updates
+  // Preserve any local call status updates (Called / Hot List) set by callers
   leadQueue.forEach(item => {
     if (item && item.mobile && map.has(item.mobile)) {
       if (item.status === "Called" || item.status === "Hot List") {
@@ -2045,27 +2050,32 @@ function checkCallerSecurityAccess() {
   const callerName = localStorage.getItem('telecaller_agent_name');
   const userRole = localStorage.getItem('telecaller_user_role') || 'Caller';
 
-  // New HTML uses class="auth-overlay" with class "hidden" to show/hide
   const modal = document.getElementById('security-auth-modal');
   const badgeName = document.getElementById('logged-user-name');
   const agentInput = document.getElementById('caller-name');
   const exportBtn = document.getElementById('export-csv-btn');
+  // Upload button — Admin only
+  const uploadLabel = document.querySelector('label[for="excel-file-input"]');
+  const uploadInput = document.getElementById('excel-file-input');
 
   if (!isAuth || !callerName) {
-    // Show lock screen
     if (modal) modal.classList.remove('hidden');
     if (badgeName) badgeName.innerText = 'Locked';
   } else {
-    // Hide lock screen, unlock app
     if (modal) modal.classList.add('hidden');
-    if (badgeName) badgeName.innerText = callerName + (userRole === 'Admin' ? ' (Admin)' : '');
+    if (badgeName) badgeName.innerText = callerName + (userRole === 'Admin' ? ' 👑' : '');
     if (agentInput) agentInput.value = callerName;
 
-    if (exportBtn) {
-      exportBtn.style.display = userRole === 'Admin' ? 'inline-flex' : 'none';
-    }
+    const isAdmin = userRole === 'Admin';
 
-    // Auto-fetch central lead queue as soon as user is unlocked
+    // Export CSV — Admin only
+    if (exportBtn) exportBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+
+    // Upload Excel — Admin only
+    if (uploadLabel) uploadLabel.style.display = isAdmin ? 'flex' : 'none';
+    if (uploadInput) uploadInput.style.display = 'none'; // always hidden, triggered by label
+
+    // Auto-silently fetch leads for ALL users on login
     fetchCentralLeadQueue();
   }
 }
