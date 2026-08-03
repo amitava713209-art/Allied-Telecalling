@@ -71,10 +71,8 @@ document.addEventListener("DOMContentLoaded", () => {
     window.lucide.createIcons();
   }
 
-  // 8. Initialize Mobile Layout Tab display (Default to Lead Queue on Mobile)
-  if (window.innerWidth <= 768) {
-    switchMobileTab('queue');
-  }
+  // 8. Always start on Lead Queue tab (default home screen)
+  switchMobileTab('queue');
 
   // 9. Register PWA Service Worker for Mobile Installation
   if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
@@ -1705,71 +1703,87 @@ function clearLeadQueue() {
   }
 }
 
-function renderLeadQueue() {
-  const container = document.getElementById("lead-queue-container");
-  const badge = document.getElementById("queue-badge-count");
+function renderLeadQueue(leadsToShow) {
+  const container = document.getElementById('lead-queue-container');
+  const badge = document.getElementById('queue-badge-count');
   if (!container) return;
 
-  const queuePanel = document.getElementById("lead-queue-panel-section") || document.querySelector(".lead-queue-panel");
-  if (queuePanel && window.innerWidth <= 768) {
-    queuePanel.classList.remove("mobile-tab-hidden");
-    queuePanel.style.display = "block";
-  }
+  const displayList = leadsToShow !== undefined ? leadsToShow : leadQueue;
 
   if (badge) {
-    const pendingCount = leadQueue.filter(l => l.status === "Pending").length;
+    const pendingCount = leadQueue.filter(l => l.status === 'Pending').length;
     badge.textContent = `${pendingCount} / ${leadQueue.length} Pending`;
   }
 
-  if (leadQueue.length === 0) {
+  if (displayList.length === 0) {
     container.innerHTML = `
-      <div class="empty-queue-hint">
-        <i data-lucide="upload" style="width:22px; height:22px; color:#94a3b8;"></i>
-        <span>Upload an Excel/CSV lead file to auto-populate numbers into your calling queue. Click any lead to load it directly into the form!</span>
+      <div class="empty-state">
+        <i data-lucide="users" style="width:40px;height:40px;color:#94a3b8;"></i>
+        <p>${leadQueue.length === 0 ? 'Tap <strong>Sync</strong> below or upload an Excel file to load Doctor leads' : 'No leads match your search'}</p>
       </div>
     `;
     if (window.lucide) window.lucide.createIcons();
     return;
   }
 
-  let html = `<div class="queue-list-grid">`;
-  // Limit DOM rendering to first 100 items for 0ms instant page load speed
-  const visibleLeads = leadQueue.slice(0, 100);
-  visibleLeads.forEach(lead => {
-    const isCalled = lead.status === "Called";
-    const statusBadgeClass = isCalled ? "queue-status-called" : "queue-status-pending";
-    const statusText = isCalled ? "Called" : "Pending";
+  // Limit to 100 for performance
+  const visibleLeads = displayList.slice(0, 100);
+  container.innerHTML = '';
 
-    html += `
-      <div class="queue-card ${isCalled ? 'card-dimmed' : ''}" data-queue-id="${lead.id}">
-        <div class="q-card-header" onclick="loadLeadToForm('${lead.id}')">
-          <div class="q-info">
-            <span class="q-name">${escapeHtml(lead.name)}</span>
-            <span class="q-mobile"><i data-lucide="smartphone"></i> ${lead.mobile}</span>
-          </div>
-          <span class="queue-status-badge ${statusBadgeClass}">${statusText}</span>
+  visibleLeads.forEach(lead => {
+    const isCalled = lead.status === 'Called';
+    const isHot = lead.status === 'Hot List';
+    const card = document.createElement('div');
+    card.className = 'lead-card' + (isCalled ? ' called-card' : '');
+    card.setAttribute('data-queue-id', lead.id);
+
+    const statusText = isCalled ? 'Called ✓' : (isHot ? '🔥 Hot List' : 'Pending');
+    const statusClass = isCalled ? 'badge-called' : (isHot ? 'badge-hot' : 'badge-pending');
+
+    // Build meta tags: mobile + category
+    let metaTags = `<span class="lead-tag">📞 ${escapeHtml(String(lead.mobile))}</span>`;
+    if (lead.category) metaTags += `<span class="lead-tag category-tag">🏷 ${escapeHtml(lead.category)}</span>`;
+    if (lead.city) metaTags += `<span class="lead-tag">📍 ${escapeHtml(lead.city)}</span>`;
+
+    card.innerHTML = `
+      <div class="lead-card-top">
+        <div>
+          <div class="lead-name">${escapeHtml(lead.name)}</div>
+          <div class="lead-meta">${metaTags}</div>
         </div>
-        <div class="q-actions">
-          <button type="button" class="btn-q-action" onclick="toggleHotListLead('${lead.id}')" title="Toggle Hot List" style="background:${lead.status === 'Hot List' ? '#fee2e2' : '#f1f5f9'}; color:${lead.status === 'Hot List' ? '#dc2626' : '#64748b'}; border:1px solid ${lead.status === 'Hot List' ? '#fca5a5' : '#cbd5e1'};">
-            <i data-lucide="flame" style="color:${lead.status === 'Hot List' ? '#dc2626' : '#64748b'};"></i> ${lead.status === 'Hot List' ? 'Hot' : 'Hot'}
-          </button>
-          <button type="button" class="btn-q-action btn-q-load" onclick="loadLeadToForm('${lead.id}')" title="Load Lead to Form">
-            <i data-lucide="arrow-left-circle"></i> Load
-          </button>
-          <button type="button" class="btn-q-action btn-q-call" onclick="triggerClickToCall('${lead.mobile}'); markLeadStatus('${lead.id}', 'Called');" title="Call Number">
-            <i data-lucide="phone-call"></i> Call
-          </button>
-          <button type="button" class="btn-q-action btn-q-wa" onclick="triggerWhatsAppChat('${lead.mobile}', '${escapeHtml(lead.name)}')" title="WhatsApp Message">
-            <i data-lucide="message-circle"></i> WhatsApp
-          </button>
-        </div>
+        <span class="lead-status-badge ${statusClass}">${statusText}</span>
+      </div>
+      <div class="lead-card-actions">
+        <button type="button" class="btn-call-big" onclick="triggerClickToCall('${lead.mobile}'); markLeadStatus('${lead.id}', 'Called');">
+          <i data-lucide="phone-call"></i> Call
+        </button>
+        <button type="button" class="btn-wa" onclick="triggerWhatsAppChat('${lead.mobile}', '${escapeHtml(lead.name).replace(/'/g, "'")}')" title="WhatsApp">💬</button>
+        <button type="button" class="btn-log" onclick="loadLeadToForm('${lead.id}')" title="Log Call">
+          <i data-lucide="edit-3"></i> Log
+        </button>
       </div>
     `;
+    container.appendChild(card);
   });
-  html += `</div>`;
 
-  container.innerHTML = html;
   if (window.lucide) window.lucide.createIcons();
+}
+
+// Search / filter the lead queue
+function filterLeadQueue(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderLeadQueue();
+    return;
+  }
+  const filtered = leadQueue.filter(l => {
+    const name = (l.name || '').toLowerCase();
+    const mobile = String(l.mobile || '').toLowerCase();
+    const category = (l.category || '').toLowerCase();
+    const city = (l.city || '').toLowerCase();
+    return name.includes(q) || mobile.includes(q) || category.includes(q) || city.includes(q);
+  });
+  renderLeadQueue(filtered);
 }
 
 function loadLeadToForm(leadId) {
@@ -1935,79 +1949,51 @@ function deleteAudioRecording() {
 
 // --- 📞 OUTBOUND CALLS AUDIT & STAT BREAKDOWN MODAL HANDLERS ---
 function openCallsAuditModal(filterCategory = 'all') {
-  const modal = document.getElementById("calls-audit-modal");
-  const tableBody = document.getElementById("audit-table-body");
-  const totalCountEl = document.getElementById("audit-total-count");
-  const uniqueCountEl = document.getElementById("audit-unique-count");
-  const titleEl = document.querySelector("#calls-audit-modal h3");
+  const modal = document.getElementById('calls-audit-modal');
+  const bodyEl = document.getElementById('calls-audit-modal-body');
+  const titleEl = document.getElementById('calls-audit-modal-title');
 
-  if (!modal || !tableBody) return;
+  if (!modal || !bodyEl) return;
 
   // Base list of valid call records
-  let filteredList = callLogs.filter(r => r.mobile && r.mobile.toString().replace(/[^0-9]/g, "").length >= 10);
-  let categoryTitle = "Daily Outbound Calls Audit";
+  let filteredList = callLogs.filter(r => r.mobile && r.mobile.toString().replace(/[^0-9]/g, '').length >= 10);
+  let categoryTitle = 'Daily Outbound Calls Audit';
 
   if (filterCategory === 'hotlist') {
-    filteredList = filteredList.filter(r => r.status === "Hot List");
-    categoryTitle = "🔥 Hot List Prospects Breakdown";
+    filteredList = filteredList.filter(r => r.status === 'Hot List');
+    categoryTitle = '🔥 Hot List Prospects';
   } else if (filterCategory === 'appointments') {
     filteredList = filteredList.filter(r => r.appointmentGiven === true);
-    categoryTitle = "Appointments Secured Breakdown";
+    categoryTitle = '📅 Appointments Secured';
   } else if (filterCategory === 'bi') {
     filteredList = filteredList.filter(r => r.biRequired === true);
-    categoryTitle = "BI Requests Customer Breakdown";
+    categoryTitle = '📄 BI Requests';
   } else if (filterCategory === 'interested') {
-    filteredList = filteredList.filter(r => r.status === "Interested");
-    categoryTitle = "Interested Leads Breakdown";
+    filteredList = filteredList.filter(r => r.status === 'Interested');
+    categoryTitle = '👍 Interested Leads';
   }
 
-  if (titleEl) titleEl.textContent = categoryTitle;
-
-  const uniqueMobiles = new Set();
-  filteredList.forEach(r => {
-    const cleanMob = r.mobile.toString().replace(/[^0-9]/g, "");
-    if (cleanMob.length >= 10) uniqueMobiles.add(cleanMob);
-  });
-
-  if (totalCountEl) totalCountEl.textContent = filteredList.length;
-  if (uniqueCountEl) uniqueCountEl.textContent = uniqueMobiles.size;
+  if (titleEl) titleEl.textContent = `${categoryTitle} (${filteredList.length})`;
 
   if (filteredList.length === 0) {
-    tableBody.innerHTML = `
-      <tr>
-        <td colspan="5" style="padding:2rem; text-align:center; color:var(--text-muted);">
-          No matching records found for this category. Click <strong>Sync All Data</strong> to fetch team logs.
-        </td>
-      </tr>
-    `;
+    bodyEl.innerHTML = `<div class="empty-state" style="padding:2rem;"><p>No records in this category yet.</p></div>`;
   } else {
-    tableBody.innerHTML = "";
-    filteredList.forEach(r => {
-      const tr = document.createElement("tr");
-      tr.style.borderBottom = "1px solid var(--border-color)";
-      const timeStr = r.timestamp ? formatDateTimeReadable(r.timestamp) : "—";
-      const cleanMob = r.mobile.toString().replace(/[^0-9]/g, "");
-
-      let statusBadge = `<span class="tbl-badge tbl-badge-interested" style="font-size:0.7rem; padding:0.15rem 0.4rem;">${r.status || "Called"}</span>`;
-      if (r.appointmentGiven) {
-        statusBadge += `<br><span style="font-size:0.68rem; color:#059669; font-weight:700;">📅 ${formatDateTimeReadable(r.appointmentDate)}</span>`;
-      }
-      if (r.biRequired) {
-        statusBadge += `<br><span style="font-size:0.68rem; color:#4338ca; font-weight:700;">📄 BI: ${escapeHtml(r.biProduct || "Req")}</span>`;
-      }
-
-      tr.innerHTML = `
-        <td style="padding:0.6rem 0.85rem; font-size:0.75rem; color:var(--text-muted);">${timeStr}</td>
-        <td style="padding:0.6rem 0.85rem; font-weight:600; color:var(--text-main);">${escapeHtml(r.name)}</td>
-        <td style="padding:0.6rem 0.85rem; font-weight:700; color:var(--primary); font-family:monospace;">${cleanMob}</td>
-        <td style="padding:0.6rem 0.85rem; color:var(--text-muted);">${escapeHtml(r.addedBy || "N/A")}</td>
-        <td style="padding:0.6rem 0.85rem;">${statusBadge}</td>
+    bodyEl.innerHTML = filteredList.map(r => {
+      const cleanMob = r.mobile.toString().replace(/[^0-9]/g, '');
+      const timeStr = r.timestamp ? formatDateTimeReadable(r.timestamp) : '—';
+      let extra = '';
+      if (r.appointmentGiven) extra += `<br><span style="color:#059669;font-size:0.72rem;">📅 ${formatDateTimeReadable(r.appointmentDate)}</span>`;
+      if (r.biRequired) extra += `<br><span style="color:#4338ca;font-size:0.72rem;">📄 BI: ${escapeHtml(r.biProduct || 'Req')}</span>`;
+      return `
+        <div class="audit-record-card">
+          <div class="audit-name">${escapeHtml(r.name)} &mdash; <span style="font-family:monospace;color:#4f46e5;">${cleanMob}</span></div>
+          <div class="audit-meta">By: ${escapeHtml(r.addedBy || 'N/A')} &bull; ${timeStr} &bull; <strong>${r.status}</strong>${extra}</div>
+        </div>
       `;
-      tableBody.appendChild(tr);
-    });
+    }).join('');
   }
 
-  modal.classList.remove("hidden-modal");
+  modal.classList.remove('hidden-modal');
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -2016,46 +2002,30 @@ function closeCallsAuditModal() {
   if (modal) modal.classList.add("hidden-modal");
 }
 
-// --- 📱 MOBILE TAB SWITCHER ENGINE ---
+// --- 📱 MOBILE TAB SWITCHER ENGINE (Mobile-First) ---
 function switchMobileTab(tabName) {
-  const queueSection = document.getElementById("lead-queue-panel-section") || document.querySelector(".lead-queue-panel");
-  const formSection = document.getElementById("form-panel-section");
-  const historySection = document.getElementById("table-panel-section") || document.querySelector(".table-panel");
+  // New HTML uses id="tab-queue", "tab-form", "tab-history" with class active-panel
+  const panels = {
+    queue:   document.getElementById('tab-queue'),
+    form:    document.getElementById('tab-form'),
+    history: document.getElementById('tab-history')
+  };
+  const navBtns = {
+    queue:   document.getElementById('nav-btn-queue'),
+    form:    document.getElementById('nav-btn-form'),
+    history: document.getElementById('nav-btn-history')
+  };
 
-  const btnQueue = document.getElementById("nav-btn-queue");
-  const btnForm = document.getElementById("nav-btn-form");
-  const btnHistory = document.getElementById("nav-btn-history");
+  // Hide all panels, deactivate all nav buttons
+  Object.values(panels).forEach(p => { if (p) p.classList.remove('active-panel'); });
+  Object.values(navBtns).forEach(b => { if (b) b.classList.remove('active'); });
 
-  const btnSync = document.getElementById("nav-btn-sync");
+  // Show requested panel and activate its nav button
+  if (panels[tabName]) panels[tabName].classList.add('active-panel');
+  if (navBtns[tabName]) navBtns[tabName].classList.add('active');
 
-  // Reset active buttons
-  if (btnQueue) btnQueue.classList.remove("active");
-  if (btnForm) btnForm.classList.remove("active");
-  if (btnHistory) btnHistory.classList.remove("active");
-  if (btnSync) btnSync.classList.remove("active");
-
-  if (queueSection) queueSection.style.display = "";
-  if (formSection) formSection.style.display = "";
-  if (historySection) historySection.style.display = "";
-
-  if (tabName === 'queue') {
-    if (queueSection) queueSection.classList.remove("mobile-tab-hidden");
-    if (formSection) formSection.classList.add("mobile-tab-hidden");
-    if (historySection) historySection.classList.add("mobile-tab-hidden");
-    if (btnQueue) btnQueue.classList.add("active");
-  } else if (tabName === 'form') {
-    if (queueSection) queueSection.classList.add("mobile-tab-hidden");
-    if (formSection) formSection.classList.remove("mobile-tab-hidden");
-    if (historySection) historySection.classList.add("mobile-tab-hidden");
-    if (btnForm) btnForm.classList.add("active");
-  } else if (tabName === 'history') {
-    if (queueSection) queueSection.classList.add("mobile-tab-hidden");
-    if (formSection) formSection.classList.add("mobile-tab-hidden");
-    if (historySection) historySection.classList.remove("mobile-tab-hidden");
-    if (btnHistory) btnHistory.classList.add("active");
-  }
-
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  // If switching to history, refresh render
+  if (tabName === 'history') renderHistoryTable();
 }
 
 window.addEventListener("resize", () => {
@@ -2071,30 +2041,28 @@ window.addEventListener("resize", () => {
 
 // --- 🔒 SECURITY ACCESS & PIN AUTHENTICATION ENGINE ---
 function checkCallerSecurityAccess() {
-  const isAuth = localStorage.getItem("telecaller_auth_token") === "TRUE";
-  const callerName = localStorage.getItem("telecaller_agent_name");
-  const userRole = localStorage.getItem("telecaller_user_role") || "Caller";
+  const isAuth = localStorage.getItem('telecaller_auth_token') === 'TRUE';
+  const callerName = localStorage.getItem('telecaller_agent_name');
+  const userRole = localStorage.getItem('telecaller_user_role') || 'Caller';
 
-  const modal = document.getElementById("security-auth-modal");
-  const badgeName = document.getElementById("logged-user-name");
-  const agentInput = document.getElementById("caller-name");
-  const exportBtn = document.getElementById("export-csv-btn");
+  // New HTML uses class="auth-overlay" with class "hidden" to show/hide
+  const modal = document.getElementById('security-auth-modal');
+  const badgeName = document.getElementById('logged-user-name');
+  const agentInput = document.getElementById('caller-name');
+  const exportBtn = document.getElementById('export-csv-btn');
 
   if (!isAuth || !callerName) {
-    if (modal) modal.classList.remove("hidden-modal");
-    if (badgeName) badgeName.innerText = "Locked";
+    // Show lock screen
+    if (modal) modal.classList.remove('hidden');
+    if (badgeName) badgeName.innerText = 'Locked';
   } else {
-    if (modal) modal.classList.add("hidden-modal");
-    if (badgeName) badgeName.innerText = callerName + (userRole === "Admin" ? " (Admin)" : "");
+    // Hide lock screen, unlock app
+    if (modal) modal.classList.add('hidden');
+    if (badgeName) badgeName.innerText = callerName + (userRole === 'Admin' ? ' (Admin)' : '');
     if (agentInput) agentInput.value = callerName;
 
-    // Lock Bulk CSV Export button for Non-Admin Callers to prevent lead theft!
     if (exportBtn) {
-      if (userRole !== "Admin") {
-        exportBtn.style.display = "none";
-      } else {
-        exportBtn.style.display = "inline-flex";
-      }
+      exportBtn.style.display = userRole === 'Admin' ? 'inline-flex' : 'none';
     }
 
     // Auto-fetch central lead queue as soon as user is unlocked

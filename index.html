@@ -3,16 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Allied Services - Telecaller Tracking Dashboard</title>
-  <!-- Google Fonts: Outfit and Inter -->
+  <title>Allied Services — Telecaller Portal</title>
+  <meta name="description" content="Allied Services telecalling CRM for managing doctor leads and call logs.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Lucide Icons CDN -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest" defer></script>
-  <!-- SheetJS CDN for Excel/CSV Parsing -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <!-- Favicon & PWA App Icons -->
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
   <link rel="manifest" href="manifest.json">
@@ -20,668 +17,346 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Allied Call">
-  <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Top Decorative Gradient Header Bar -->
-  <div class="top-gradient-bar"></div>
+<!-- =============================================
+     🔒 SECURITY AUTH MODAL (full-screen lock)
+     ============================================= -->
+<div class="auth-overlay" id="security-auth-modal">
+  <div class="auth-box">
+    <img src="logo.png" alt="Allied Services" class="auth-logo">
+    <h1 class="auth-title">Allied Telecalling</h1>
+    <p class="auth-subtitle">Enter your credentials to unlock</p>
+    <form onsubmit="handleCallerLogin(event)" id="auth-form">
+      <div class="auth-field">
+        <label>Your Name</label>
+        <input type="text" id="auth-caller-name" placeholder="e.g. Priya" autocomplete="off" required>
+      </div>
+      <div class="auth-field">
+        <label>Security PIN</label>
+        <input type="password" id="auth-caller-pin" placeholder="Enter PIN" autocomplete="off" required inputmode="numeric">
+      </div>
+      <div id="auth-error-msg" class="auth-error hidden"></div>
+      <button type="submit" class="auth-btn" id="auth-submit-btn">
+        <i data-lucide="key-round"></i> Unlock Access
+      </button>
+    </form>
+  </div>
+</div>
 
-  <div class="app-container">
-    <!-- Header Block -->
-    <header class="app-header animate-fade-in">
-      <div class="header-logo">
-        <div class="logo-img-container">
-          <img src="logo.png" alt="Allied Services Logo" class="app-logo-img">
-        </div>
-        <div class="logo-text">
-          <h1>Daily Calling <span class="accent-text">Dashboard</span></h1>
-          <p>Allied Services Telecaller Portal</p>
+<!-- =============================================
+     📱 MAIN APP SHELL
+     ============================================= -->
+<div class="app-shell">
+
+  <!-- TOP HEADER BAR -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <img src="logo.png" alt="Allied" class="top-logo">
+      <span class="top-brand">Allied Calling</span>
+    </div>
+    <div class="top-bar-right">
+      <span id="logged-user-name" class="user-pill">Locked</span>
+      <button class="top-icon-btn" onclick="openSettings()" title="Settings">
+        <i data-lucide="settings"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- STATS STRIP (always visible) -->
+  <div class="stats-strip">
+    <div class="stat-pill" onclick="openCallsAuditModal('all')">
+      <span id="stat-total-calls">0</span>
+      <label>Calls</label>
+    </div>
+    <div class="stat-pill stat-hot" onclick="openCallsAuditModal('hotlist')">
+      <span id="stat-hot-list">0</span>
+      <label>🔥 Hot</label>
+    </div>
+    <div class="stat-pill stat-green" onclick="openCallsAuditModal('appointments')">
+      <span id="stat-appointments">0</span>
+      <label>Apts</label>
+    </div>
+    <div class="stat-pill stat-purple" onclick="openCallsAuditModal('bi')">
+      <span id="stat-bi-requests">0</span>
+      <label>BI</label>
+    </div>
+    <div class="stat-pill stat-amber" onclick="openCallsAuditModal('interested')">
+      <span id="stat-interested">0</span>
+      <label>Leads</label>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="main-content">
+
+    <!-- ===== TAB 1: LEAD QUEUE ===== -->
+    <section id="tab-queue" class="tab-panel active-panel" data-panel="queue">
+
+      <div class="panel-toolbar">
+        <input type="search" id="lead-search-input" class="search-box" placeholder="🔍 Search doctor name or number..." oninput="filterLeadQueue(this.value)">
+        <div class="toolbar-actions">
+          <span id="queue-badge-count" class="count-badge">0 Pending</span>
+          <label for="excel-file-input" class="upload-btn" title="Upload Excel or CSV">
+            <i data-lucide="upload-cloud"></i>
+          </label>
+          <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" onchange="handleExcelUpload(event)" style="display:none">
         </div>
       </div>
-      
-      <div class="header-actions">
-        <div class="date-badge">
-          <i data-lucide="calendar"></i>
-          <span id="current-date">May 22, 2026</span>
-        </div>
 
-        <!-- Active Logged In Caller Badge -->
-        <div class="date-badge" id="user-badge" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;" title="Active Logged-in Caller">
-          <i data-lucide="user-check"></i>
-          <span id="logged-user-name">Caller Logged In</span>
-        </div>
-        
-        <!-- Google Sheet Sync Status Indicator Button -->
-        <button id="sync-status-btn" class="status-badge state-connected" onclick="openSettings()">
-          <span class="pulse-indicator"></span>
-          <i data-lucide="database"></i>
-          <span id="sync-status-text">Sheets Connected</span>
-        </button>
-
-        <button class="icon-btn" onclick="openSettings()" id="settings-btn" title="Google Sheets Setup">
-          <i data-lucide="settings"></i>
-        </button>
-        <button class="icon-btn" onclick="logoutCaller()" title="Logout Caller Access" style="color:#dc2626;">
-          <i data-lucide="log-out"></i>
-        </button>
-      </div>
-    </header>
-
-    <!-- Analytics Dashboard Cards -->
-    <section class="analytics-container animate-slide-down">
-      <div class="stat-card card-glow-rose" onclick="openCallsAuditModal('hotlist')" style="cursor:pointer; background:#fff1f2; border:1px solid #fecdd3;" title="Click to view all High Priority Hot List prospects">
-        <div class="stat-icon" style="background:#ffe4e6; color:#e11d48;">
-          <i data-lucide="flame"></i>
-        </div>
-        <div class="stat-content">
-          <span class="stat-label" style="color:#9f1239; font-weight:700;">🔥 Hot List <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
-          <h3 id="stat-hot-list" style="color:#9f1239;">0 <span class="percentage" id="stat-hot-list-pct">(0%)</span></h3>
-        </div>
-      </div>
-
-      <div class="stat-card card-glow-indigo" onclick="openCallsAuditModal('all')" style="cursor:pointer;" title="Click to view total calls breakdown">
-        <div class="stat-icon bg-soft-indigo">
-          <i data-lucide="users"></i>
-        </div>
-        <div class="stat-content">
-          <span class="stat-label">Total Calls Today <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
-          <h3 id="stat-total-calls">0</h3>
-        </div>
-      </div>
-
-      <div class="stat-card card-glow-emerald" onclick="openCallsAuditModal('appointments')" style="cursor:pointer;" title="Click to view all secured appointments details">
-        <div class="stat-icon bg-soft-emerald">
-          <i data-lucide="calendar-check"></i>
-        </div>
-        <div class="stat-content">
-          <span class="stat-label">Appointments Secured <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
-          <h3 id="stat-appointments">0 <span class="percentage" id="stat-appointments-pct">(0%)</span></h3>
-        </div>
-      </div>
-
-      <div class="stat-card card-glow-purple" onclick="openCallsAuditModal('bi')" style="cursor:pointer;" title="Click to view BI request customer details">
-        <div class="stat-icon bg-soft-purple">
-          <i data-lucide="file-text"></i>
-        </div>
-        <div class="stat-content">
-          <span class="stat-label">BI Requests <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
-          <h3 id="stat-bi-requests">0</h3>
-        </div>
-      </div>
-
-      <div class="stat-card card-glow-amber" onclick="openCallsAuditModal('interested')" style="cursor:pointer;" title="Click to view interested leads details">
-        <div class="stat-icon bg-soft-amber">
-          <i data-lucide="heart-handshake"></i>
-        </div>
-        <div class="stat-content">
-          <span class="stat-label">Interested Leads <i data-lucide="external-link" style="width:11px; height:11px; margin-left:2px;"></i></span>
-          <h3 id="stat-interested">0 <span class="percentage" id="stat-interested-pct">(0%)</span></h3>
+      <div id="lead-queue-container" class="cards-list">
+        <div class="empty-state">
+          <i data-lucide="users" style="width:40px;height:40px;color:#94a3b8;"></i>
+          <p>Tap <strong>Sync</strong> below to load your Doctor leads</p>
         </div>
       </div>
     </section>
 
-    <!-- Main Workspace Layout -->
-    <main class="workspace-grid" id="workspace-grid-container">
-      <!-- Left Column: Form Panel -->
-      <section class="form-panel animate-slide-right" id="form-panel-section">
-        <div class="panel-header" id="form-header-container">
-          <i data-lucide="user-plus" id="form-header-icon"></i>
-          <h2 id="form-header-title">Log New Call Update</h2>
-        </div>
-        
-        <form id="call-form" onsubmit="handleFormSubmit(event)">
-          <!-- Caller Agent Name -->
-          <div class="form-group">
-            <label for="caller-name">
-              Caller Agent Name <span class="required">*</span>
-            </label>
-            <div class="input-wrapper">
-              <i data-lucide="user-check" class="input-icon"></i>
-              <input type="text" id="caller-name" placeholder="Enter your name" required autocomplete="off">
-            </div>
-          </div>
-          <!-- Customer Name -->
-          <div class="form-group">
-            <label for="customer-name">
-              Customer Name <span class="required">*</span>
-            </label>
-            <div class="input-wrapper">
-              <i data-lucide="user" class="input-icon"></i>
-              <input type="text" id="customer-name" placeholder="Amit Kumar" required autocomplete="off">
-            </div>
-          </div>
-
-          <!-- Mobile Number & Quick Actions -->
-          <div class="form-group">
-            <label for="mobile-number">
-              Mobile Number <span class="required">*</span>
-            </label>
-            <div class="input-wrapper mobile-input-wrapper">
-              <i data-lucide="smartphone" class="input-icon"></i>
-              <input type="tel" id="mobile-number" placeholder="10-digit mobile number" required pattern="[0-9]{10}" title="Please enter a valid 10-digit mobile number" autocomplete="off">
-              <div class="quick-dial-actions">
-                <button type="button" class="btn-dial-call" onclick="triggerClickToCall()" title="Call Native SIM Dialer">
-                  <i data-lucide="phone-call"></i> Call
-                </button>
-                <button type="button" class="btn-dial-wa" onclick="triggerWhatsAppChat()" title="Open Direct WhatsApp Chat">
-                  <i data-lucide="message-circle"></i> WhatsApp
-                </button>
-              </div>
-            </div>
-            <span class="field-hint">Format: 10 digits without spaces or country code</span>
-            <div id="duplicate-warning-container" class="duplicate-warning hidden"></div>
-          </div>
-
-          <!-- Age and Gender Grid -->
-          <div class="form-row-grid">
-            <!-- Age (Optional) -->
-            <div class="form-group">
-              <label for="customer-age">
-                Age <span class="optional">(Optional)</span>
-              </label>
-              <div class="input-wrapper">
-                <i data-lucide="badge-help" class="input-icon"></i>
-                <input type="number" id="customer-age" placeholder="Age" min="1" max="120">
-              </div>
-            </div>
-
-            <!-- Gender -->
-            <div class="form-group">
-              <label for="customer-gender">
-                Gender <span class="required">*</span>
-              </label>
-              <div class="input-wrapper">
-                <i data-lucide="venus-mars" class="input-icon"></i>
-                <select id="customer-gender" required>
-                  <option value="" disabled selected>Select...</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Call Status (Interested / Thinking / Not Interested / Lead) -->
-          <div class="form-group">
-            <label>
-              Call Status <span class="required">*</span>
-            </label>
-            <div class="segmented-control">
-              <label class="segment-option">
-                <input type="radio" name="call-status" value="Hot List" required>
-                <span class="segment-btn badge-hot-list" style="background:#fef2f2; color:#dc2626; border-color:#fca5a5;">
-                  <i data-lucide="flame" style="color:#dc2626;"></i>
-                  🔥 Hot List
-                </span>
-              </label>
-              <label class="segment-option">
-                <input type="radio" name="call-status" value="Interested" checked required>
-                <span class="segment-btn badge-interested">
-                  <i data-lucide="thumbs-up"></i>
-                  Interested
-                </span>
-              </label>
-              <label class="segment-option">
-                <input type="radio" name="call-status" value="Thinking" required>
-                <span class="segment-btn badge-thinking">
-                  <i data-lucide="message-square-more"></i>
-                  Thinking
-                </span>
-              </label>
-              <label class="segment-option">
-                <input type="radio" name="call-status" value="Not Interested" required>
-                <span class="segment-btn badge-not-interested">
-                  <i data-lucide="thumbs-down"></i>
-                  Not Interested
-                </span>
-              </label>
-              <label class="segment-option">
-                <input type="radio" name="call-status" value="Lead" required>
-                <span class="segment-btn badge-lead">
-                  <i data-lucide="sparkles"></i>
-                  Lead
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Appointment Given Toggle Row -->
-          <div class="form-group-toggle" id="appointment-toggle-row">
-            <div class="toggle-info">
-              <label for="appointment-given">Appointment Given?</label>
-              <p class="field-hint">Has customer agreed to an appointment?</p>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="appointment-given" onchange="toggleAppointmentField()">
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <!-- Date of Appointment (Conditional) -->
-          <div class="form-group conditional-field" id="appointment-date-group">
-            <label for="appointment-date">
-              Appointment Date & Time <span class="required">*</span>
-            </label>
-            <div class="input-wrapper">
-              <i data-lucide="calendar" class="input-icon"></i>
-              <input type="datetime-local" id="appointment-date">
-            </div>
-          </div>
-
-          <hr class="form-divider">
-
-          <!-- BI (Benefit Illustration) Required Toggle Row -->
-          <div class="form-group-toggle">
-            <div class="toggle-info">
-              <label for="bi-required">BI Required?</label>
-              <p class="field-hint">Does the customer need a Benefit Illustration?</p>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="bi-required" onchange="toggleBiField()">
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <!-- BI Product Category (Conditional) -->
-          <div class="form-group conditional-field" id="bi-product-group">
-            <label for="bi-product">
-              Select Product Category <span class="required">*</span>
-            </label>
-            <div class="input-wrapper">
-              <i data-lucide="box" class="input-icon"></i>
-              <select id="bi-product">
-                <option value="" disabled selected>Select Product Category...</option>
-                <option value="Retirement">Retirement</option>
-                <option value="Savings">Savings</option>
-                <option value="Term">Term</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Call Comments / Remarks -->
-          <div class="form-group">
-            <label for="call-comments">
-              Call Comments / Remarks <span class="optional">(Optional)</span>
-            </label>
-            <div class="input-wrapper">
-              <i data-lucide="message-square" class="input-icon" style="top: 0.85rem;"></i>
-              <textarea id="call-comments" placeholder="Enter remarks about the client call..." autocomplete="off"></textarea>
-            </div>
-          </div>
-
-          <!-- Voice Call Audio Recorder Widget (HTML5 MediaRecorder) -->
-          <div class="form-group voice-recorder-group">
-            <label>
-              Voice Note / Call Recording <span class="optional">(Optional)</span>
-            </label>
-            <div class="voice-recorder-box">
-              <div class="voice-controls">
-                <button type="button" id="btn-record-start" class="btn-recorder btn-rec-start" onclick="toggleAudioRecording()">
-                  <i data-lucide="mic"></i> <span id="rec-btn-text">Record Voice Note</span>
-                </button>
-                <span id="rec-timer" class="rec-timer-badge hidden">00:00</span>
-              </div>
-              <div id="audio-preview-container" class="audio-preview-container hidden">
-                <audio id="audio-player" controls></audio>
-                <button type="button" class="btn-icon-only btn-tbl-danger" onclick="deleteAudioRecording()" title="Delete Recording">
-                  <i data-lucide="trash-2"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Form Buttons -->
-          <div class="form-actions">
-            <button type="button" class="btn-secondary" onclick="resetForm()">
-              <i data-lucide="refresh-cw"></i>
-              Clear
-            </button>
-            <button type="submit" class="btn-primary">
-              <i data-lucide="save"></i>
-              Save Call Record
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <!-- Right Column: Lead Queue & Call History Table -->
-      <div class="right-column-container" style="display:flex; flex-direction:column; gap:1.5rem;">
-        <!-- Excel Lead Import & Calling Queue Card -->
-        <section class="lead-queue-panel animate-slide-left" id="lead-queue-panel-section" style="background:#ffffff; border-radius:var(--radius-lg); border:1px solid var(--border-color); padding:1.25rem; box-shadow:var(--shadow-sm);">
-          <div class="lead-queue-header">
-          <div class="queue-title">
-            <i data-lucide="file-spreadsheet" class="indigo-text"></i>
-            <h3>Import Leads & Call Queue</h3>
-            <span id="queue-badge-count" class="queue-badge">0 Loaded</span>
-          </div>
-          <div class="queue-actions">
-            <label for="excel-file-input" class="btn-soft btn-upload-excel">
-              <i data-lucide="upload-cloud"></i> Upload Excel / CSV
-            </label>
-            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)" style="display:none;">
-            <button type="button" class="btn-soft" onclick="clearLeadQueue()" title="Clear Queue List">
-              <i data-lucide="trash-2"></i> Clear Queue
-            </button>
-          </div>
-        </div>
-        <div id="lead-queue-container" class="lead-queue-container">
-            <div class="empty-queue-hint">
-              <i data-lucide="upload" style="width:22px; height:22px; color:#94a3b8;"></i>
-              <span>Upload an Excel/CSV lead file to auto-populate numbers into your calling queue. Click any lead to load it directly into the form!</span>
-            </div>
-          </div>
-      </section>
-
-      <!-- Right Column: Call History Table -->
-      <section class="table-panel animate-slide-left" id="table-panel-section">
-        <div class="panel-header-row">
-          <div class="panel-header">
-            <i data-lucide="list-checks"></i>
-            <h2>Team Calling History</h2>
-            <button class="btn-icon-only btn-refresh" id="refresh-sync-btn" onclick="fetchRemoteLogs()" title="Sync & Fetch Remote Logs" style="padding: 4px; border: none; background: transparent; width: 28px; height: 28px; border-radius: 50%;">
-              <i data-lucide="refresh-cw" id="refresh-icon" style="width: 16px; height: 16px; color: var(--primary);"></i>
-            </button>
-          </div>
-          
-          <div class="action-buttons">
-            <button class="btn-soft" onclick="openCallsAuditModal()" title="View Outbound Calls Audit & Dialed Numbers Breakdown" style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-weight:700;">
-              <i data-lucide="phone-call"></i>
-              Call Audit
-            </button>
-            <button class="btn-soft" id="refresh-sync-btn" onclick="fetchRemoteLogs()" title="Sync & Fetch Remote Sheet Logs" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe; font-weight:700;">
-              <i data-lucide="refresh-cw" id="refresh-icon"></i>
-              Sync All Data
-            </button>
-            <button class="btn-soft" onclick="window.print()" title="Print Summary Report">
-              <i data-lucide="printer"></i>
-              Print
-            </button>
-            <button class="btn-soft" id="export-csv-btn" onclick="exportCallLogsToCSV()" title="Export Today's Logs to Excel/CSV">
-              <i data-lucide="download"></i>
-              Export CSV
-            </button>
-            <button class="btn-danger-soft" onclick="clearTodayLogs()" title="Clear Dashboard Logs">
-              <i data-lucide="trash-2"></i>
-              Clear All
-            </button>
-          </div>
-        </div>
-
-        <!-- Filter and Search Row -->
-        <div class="filter-search-row">
-          <div class="search-box">
-            <i data-lucide="search" class="search-icon"></i>
-            <input type="text" id="search-input" placeholder="Search by name or mobile..." oninput="filterCallHistory()">
-          </div>
-
-          <div class="filter-group">
-            <div class="date-filter-wrapper" style="position:relative; display:flex; align-items:center;">
-              <input type="date" id="filter-date" class="date-filter-input" onchange="filterCallHistory()" title="Filter by Date">
-              <button type="button" class="btn-clear-date" onclick="clearDateFilter()" title="Clear Date & Show All Logs" style="position:absolute; right:2.2rem; background:transparent; border:none; color:#64748b; cursor:pointer; font-size:0.85rem; font-weight:700; padding:0 4px;">✕</button>
-            </div>
-
-            <div class="select-wrapper">
-              <select id="filter-status" onchange="filterCallHistory()">
-                <option value="All">All Statuses</option>
-                <option value="Hot List">🔥 Hot List Only</option>
-                <option value="Interested">Interested</option>
-                <option value="Thinking">Thinking</option>
-                <option value="Not Interested">Not Interested</option>
-                <option value="Lead">Lead</option>
-              </select>
-            </div>
-
-            <div class="select-wrapper">
-              <select id="filter-appointment" onchange="filterCallHistory()">
-                <option value="All">All Appointments</option>
-                <option value="Yes">Appointment Given</option>
-                <option value="No">No Appointment</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Call Logs Scrollable Container -->
-        <div class="table-responsive">
-          <table class="history-table" id="history-table">
-            <thead>
-              <tr>
-                <th>Customer Details</th>
-                <th>Gender & Age</th>
-                <th>Status</th>
-                <th>Appointment Details</th>
-                <th>Voice Recording</th>
-                <th>Sync Status</th>
-                <th class="actions-header">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="history-table-body">
-              <!-- Dynamically populated rows -->
-              <tr class="empty-state-row">
-                <td colspan="7">
-                  <div class="empty-state">
-                    <i data-lucide="clipboard-list" class="empty-icon"></i>
-                    <h3>No calls logged today</h3>
-                    <p>Use the form on the left to start tracking calls.</p>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        
-        <!-- Mobile Cards List Container -->
-        <div class="mobile-cards-container" id="mobile-cards-list"></div>
-        
-        <!-- Table Summary Row -->
-        <div class="table-footer">
-          <span id="showing-records-text">Showing 0 of 0 entries</span>
-        </div>
-      </section>
-    </div>
-    </main>
-
-    <!-- Mobile Bottom Tab Navigation -->
-    <div class="mobile-nav-bar" style="display:grid; grid-template-columns:repeat(5, 1fr);">
-      <button class="mobile-nav-item active" id="nav-btn-queue" onclick="switchMobileTab('queue')">
-        <i data-lucide="upload"></i>
-        <span>Queue</span>
-      </button>
-      <button class="mobile-nav-item" id="nav-btn-form" onclick="switchMobileTab('form')">
-        <i data-lucide="edit-3"></i>
-        <span>Log Call</span>
-      </button>
-      <button class="mobile-nav-item" id="nav-btn-history" onclick="switchMobileTab('history')">
-        <i data-lucide="list-checks"></i>
-        <span>History</span>
-      </button>
-      <button class="mobile-nav-item" id="nav-btn-sync" onclick="switchMobileTab('queue'); fetchRemoteLogs(); fetchCentralLeadQueue();" style="color:var(--primary);">
-        <i data-lucide="refresh-cw"></i>
-        <span>Sync</span>
-      </button>
-      <button class="mobile-nav-item" id="nav-btn-logout" onclick="logoutCaller()" style="color:#dc2626;">
-        <i data-lucide="log-out"></i>
-        <span>Lock</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- Settings / Google Sheets Setup Modal -->
-  <div class="modal-overlay hidden-modal" id="settings-modal" style="display: none;">
-    <div class="modal-container">
-      <div class="modal-header">
-        <div class="modal-title">
-          <i data-lucide="settings" class="indigo-text"></i>
-          <h3>Google Sheets Sync Settings</h3>
-        </div>
-        <button class="close-btn" onclick="closeSettings()">&times;</button>
+    <!-- ===== TAB 2: LOG CALL ===== -->
+    <section id="tab-form" class="tab-panel" data-panel="form">
+      <div class="form-top-bar">
+        <i data-lucide="phone-call" id="form-header-icon" class="form-icon"></i>
+        <h2 id="form-header-title" class="form-title">Log New Call</h2>
       </div>
 
-      <div class="modal-body">
-        <p class="modal-intro">
-          Automatically push every calling update directly into a central Google Sheet. Set up Google Sheets Sync in a few quick steps:
-        </p>
-        
-        <!-- Setup Accordion Steps -->
-        <div class="setup-steps">
-          <div class="step-card">
-            <span class="step-number">1</span>
-            <div class="step-info">
-              <h4>Get the Apps Script Code</h4>
-              <p>We created a file named <code>google-script.js</code> in your folder. Copy its contents entirely.</p>
-            </div>
+      <form id="call-form" onsubmit="handleFormSubmit(event)" class="call-form" id="form-panel-section">
+        <!-- Hidden element for resetForm compatibility -->
+        <div style="display:none">
+          <div id="appointment-date-group">
+            <input type="datetime-local" id="appointment-date">
           </div>
-          <div class="step-card">
-            <span class="step-number">2</span>
-            <div class="step-info">
-              <h4>Open Apps Script in Sheet</h4>
-              <p>In your Google Sheet, click <strong>Extensions</strong> > <strong>Apps Script</strong>. Paste the code there, save, and deploy it as a <strong>Web App</strong> (Execute as: "Me", Access: "Anyone").</p>
-            </div>
+          <div id="bi-product-group"></div>
+          <div id="appointment-toggle-row" class="hidden-toggle">
+            <input type="checkbox" id="appointment-given" onchange="toggleAppointmentField()">
           </div>
-          <div class="step-card">
-            <span class="step-number">3</span>
-            <div class="step-info">
-              <h4>Paste Web App URL</h4>
-              <p>Paste the deployed Web App URL (ends with <code>/exec</code>) in the field below.</p>
-            </div>
+          <input type="checkbox" id="bi-required" onchange="toggleBiField()">
+        </div>
+
+        <div class="form-field">
+          <label>Your Name</label>
+          <input type="text" id="caller-name" placeholder="Enter your name" required autocomplete="off">
+        </div>
+
+        <div class="form-field">
+          <label>Customer Name <span class="req">*</span></label>
+          <input type="text" id="customer-name" placeholder="Doctor / Patient Name" required autocomplete="off">
+        </div>
+
+        <div class="form-field">
+          <label>Mobile Number <span class="req">*</span></label>
+          <div class="mobile-row">
+            <input type="tel" id="mobile-number" placeholder="10-digit number" required pattern="[0-9]{10}" autocomplete="off" inputmode="numeric">
+            <button type="button" class="quick-btn call-btn" onclick="triggerClickToCall()" title="Call">📞</button>
+            <button type="button" class="quick-btn wa-btn" onclick="triggerWhatsAppChat()" title="WhatsApp">💬</button>
+          </div>
+          <div id="duplicate-warning-container" class="dup-warn hidden"></div>
+        </div>
+
+        <div class="two-col">
+          <div class="form-field">
+            <label>Age <span class="opt">(Optional)</span></label>
+            <input type="number" id="customer-age" placeholder="Age" min="1" max="120" inputmode="numeric">
+          </div>
+          <div class="form-field">
+            <label>Gender <span class="req">*</span></label>
+            <select id="customer-gender" required>
+              <option value="" disabled selected>Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
           </div>
         </div>
 
-        <hr class="modal-divider">
+        <div class="form-field">
+          <label>City <span class="opt">(Optional)</span></label>
+          <input type="text" id="customer-city" placeholder="City name">
+        </div>
 
-        <!-- Input for Web App URL -->
-        <div class="form-group">
-          <label for="web-app-url">Google Web App URL (Deploy Executable Link)</label>
-          <div class="input-wrapper">
-            <i data-lucide="link" class="input-icon"></i>
-            <input type="url" id="web-app-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+        <div class="form-field">
+          <label>Call Result <span class="req">*</span></label>
+          <div class="status-grid">
+            <label class="status-chip hot-chip">
+              <input type="radio" name="call-status" value="Hot List" required> 🔥 Hot List
+            </label>
+            <label class="status-chip int-chip">
+              <input type="radio" name="call-status" value="Interested" checked> 👍 Interested
+            </label>
+            <label class="status-chip think-chip">
+              <input type="radio" name="call-status" value="Thinking"> 🤔 Thinking
+            </label>
+            <label class="status-chip notint-chip">
+              <input type="radio" name="call-status" value="Not Interested"> 👎 Not Interested
+            </label>
+            <label class="status-chip lead-chip">
+              <input type="radio" name="call-status" value="Lead"> ⭐ Lead
+            </label>
+            <label class="status-chip refused-chip">
+              <input type="radio" name="call-status" value="Refused"> 🚫 Refused
+            </label>
           </div>
         </div>
 
-        <!-- Connection Test Block -->
-        <div class="test-connection-row">
-          <button type="button" class="btn-primary" id="test-conn-btn" onclick="testSheetConnection()">
-            <i data-lucide="radio"></i>
-            Test Sheet Connection
+        <div class="form-field">
+          <label>Call Comments</label>
+          <textarea id="call-comments" placeholder="Notes from the call..." rows="3"></textarea>
+        </div>
+
+        <div class="form-field">
+          <label>Voice Note <span class="opt">(Optional)</span></label>
+          <div class="audio-row" id="audio-controls">
+            <button type="button" class="audio-btn" id="record-btn" onclick="toggleAudioRecording()">
+              <i data-lucide="mic"></i> Record
+            </button>
+            <span id="recording-timer" class="rec-timer hidden">⏺ 0:00</span>
+            <span id="audio-status" class="audio-status"></span>
+          </div>
+        </div>
+
+        <button type="submit" class="save-btn" id="submit-btn">
+          <i data-lucide="save"></i> Save Call Log
+        </button>
+        <button type="button" class="clear-form-btn" id="clear-form-btn" onclick="resetForm()">
+          Clear Form
+        </button>
+      </form>
+    </section>
+
+    <!-- ===== TAB 3: TEAM HISTORY ===== -->
+    <section id="tab-history" class="tab-panel" data-panel="history" id="table-panel-section">
+
+      <div class="panel-toolbar">
+        <input type="search" id="search-input" class="search-box" placeholder="🔍 Search name, mobile, agent..." oninput="filterCallHistory()">
+        <div class="toolbar-actions">
+          <button class="icon-btn-sm" onclick="fetchRemoteLogs()" title="Refresh" id="refresh-sync-btn">
+            <i data-lucide="refresh-cw" id="refresh-icon"></i>
           </button>
-          <span id="test-conn-status" class="test-status-text">Not Configured</span>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
-        <button class="btn-primary" onclick="saveSettings()">Save & Sync Config</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Notification Toast Container -->
-  <div id="toast-container" class="toast-container"></div>
-
-  <!-- Application Script -->
-  <script src="app.js"></script>
-  <!-- ==========================================================================
-       📞 OUTBOUND CALLS AUDIT MODAL (NUMBERS DIALED BREAKDOWN)
-       ========================================================================== -->
-  <div class="modal-overlay hidden-modal" id="calls-audit-modal">
-    <div class="modal-container" style="max-width: 680px;">
-      <div class="modal-header">
-        <div class="modal-header-title">
-          <i data-lucide="phone-call" style="color:var(--primary);"></i>
-          <h3>Daily Outbound Calls Audit</h3>
-        </div>
-        <button type="button" class="btn-clear-date" onclick="closeCallsAuditModal()" title="Close Audit Modal" style="background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; font-size:1.1rem; font-weight:800; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer;">✕</button>
-      </div>
-
-      <div class="modal-body" style="padding: 1.25rem;">
-        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1rem;">
-          Detailed breakdown of unique numbers called through the app today to verify caller productivity and prevent personal call disputes.
-        </p>
-
-        <div style="background:#f8fafc; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.85rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Verified Official Calls</span>
-            <strong id="audit-total-count" style="font-size:1.4rem; color:var(--primary);">0</strong>
-          </div>
-          <div>
-            <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; display:block;">Unique Numbers Dialed</span>
-            <strong id="audit-unique-count" style="font-size:1.4rem; color:var(--success-text);">0</strong>
-          </div>
-        </div>
-
-        <div style="max-height:340px; overflow-y:auto; border:1px solid var(--border-color); border-radius:var(--radius-md);">
-          <table style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
-            <thead>
-              <tr style="background:#f1f5f9; border-bottom:1px solid var(--border-color);">
-                <th style="padding:0.6rem 0.85rem;">Time</th>
-                <th style="padding:0.6rem 0.85rem;">Customer Name</th>
-                <th style="padding:0.6rem 0.85rem;">Mobile Number Dialed</th>
-                <th style="padding:0.6rem 0.85rem;">Caller Agent</th>
-                <th style="padding:0.6rem 0.85rem;">Call Status</th>
-              </tr>
-            </thead>
-            <tbody id="audit-table-body">
-              <!-- Dynamically populated -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn-primary" onclick="closeCallsAuditModal()">Close Audit Report</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==========================================================================
-       🔒 CALLER SECURITY AUTHENTICATION & LOGIN MODAL
-       ========================================================================== -->
-  <div class="modal-overlay hidden-modal" id="security-auth-modal" style="z-index: 99999; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);">
-    <div class="modal-container" style="max-width: 420px; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); border: 1px solid var(--border-color);">
-      <div class="modal-header" style="background: linear-gradient(135deg, #4f46e5, #3730a3); color: #ffffff; padding: 1.25rem 1.5rem; border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg);">
-        <div class="modal-header-title" style="display:flex; align-items:center; gap:0.65rem;">
-          <i data-lucide="shield-check" style="width:24px; height:24px; color:#60a5fa;"></i>
-          <h3 style="color:#ffffff; font-size:1.15rem; margin:0;">Caller Security Portal</h3>
-        </div>
-      </div>
-
-      <div class="modal-body" style="padding: 1.5rem;">
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem; line-height:1.4;">
-          Authorized telecaller access only. Please enter your Caller Agent Name and 4-digit Security PIN to unlock data access.
-        </p>
-
-        <form id="auth-login-form" onsubmit="handleCallerLogin(event)">
-          <div class="form-group" style="margin-bottom:1rem;">
-            <label for="auth-caller-name" style="font-size:0.85rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:0.35rem;">
-              Caller Agent Name <span style="color:#dc2626;">*</span>
-            </label>
-            <div class="input-wrapper">
-              <i data-lucide="user-check" class="input-icon"></i>
-              <input type="text" id="auth-caller-name" placeholder="e.g. Moupriya" required autocomplete="off" style="width:100%; padding:0.65rem 0.75rem 0.65rem 2.4rem; border-radius:var(--radius-md); border:1px solid var(--border-color);">
-            </div>
-          </div>
-
-          <div class="form-group" style="margin-bottom:1.25rem;">
-            <label for="auth-caller-pin" style="font-size:0.85rem; font-weight:600; color:var(--text-main); display:block; margin-bottom:0.35rem;">
-              Security PIN <span style="color:#dc2626;">*</span>
-            </label>
-            <div class="input-wrapper">
-              <i data-lucide="lock" class="input-icon"></i>
-              <input type="password" id="auth-caller-pin" placeholder="Enter 4-digit PIN" required maxlength="10" autocomplete="off" style="width:100%; padding:0.65rem 0.75rem 0.65rem 2.4rem; border-radius:var(--radius-md); border:1px solid var(--border-color); font-size:1.1rem; letter-spacing:2px;">
-            </div>
-          </div>
-
-          <div id="auth-error-msg" class="hidden" style="background:#fee2e2; border:1px solid #fca5a5; color:#dc2626; font-size:0.82rem; padding:0.6rem; border-radius:var(--radius-md); margin-bottom:1rem; text-align:center; font-weight:600;"></div>
-
-          <button type="submit" id="auth-submit-btn" class="btn-primary" style="width:100%; padding:0.75rem; font-size:0.95rem; font-weight:700; border-radius:var(--radius-md); justify-content:center;">
-            <i data-lucide="key-round"></i> Unlock Access
+          <button id="export-csv-btn" class="icon-btn-sm" onclick="exportCallLogsToCSV()" title="Export CSV" style="display:none">
+            <i data-lucide="download"></i>
           </button>
-        </form>
+        </div>
+      </div>
+
+      <div class="history-filters">
+        <select id="filter-status" onchange="filterCallHistory()" class="filter-select">
+          <option value="All">All Status</option>
+          <option value="Hot List">🔥 Hot List</option>
+          <option value="Interested">👍 Interested</option>
+          <option value="Thinking">🤔 Thinking</option>
+          <option value="Not Interested">👎 Not Interested</option>
+          <option value="Lead">⭐ Lead</option>
+          <option value="Refused">🚫 Refused</option>
+        </select>
+        <select id="filter-appointment" onchange="filterCallHistory()" class="filter-select">
+          <option value="">All Appts</option>
+          <option value="Yes">Appt: Yes</option>
+          <option value="No">Appt: No</option>
+        </select>
+        <input type="date" id="filter-date" class="filter-date" onchange="filterCallHistory()">
+      </div>
+
+      <div class="sync-bar">
+        <span class="pulse-dot" id="sync-status-btn"></span>
+        <span id="sync-status-text">Sheets Connected</span>
+        <span id="showing-records-text" class="records-count"></span>
+      </div>
+
+      <!-- History rendered here — mobile cards AND desktop table rows -->
+      <div id="mobile-cards-list" class="cards-list"></div>
+      <div class="table-wrapper">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Gender/Age</th>
+              <th>Status</th>
+              <th>Appointment</th>
+              <th>Audio</th>
+              <th>Sync</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- BOTTOM NAVIGATION BAR -->
+  <nav class="bottom-nav">
+    <button class="nav-tab active" id="nav-btn-queue" onclick="switchMobileTab('queue')">
+      <i data-lucide="users"></i>
+      <span>Leads</span>
+    </button>
+    <button class="nav-tab" id="nav-btn-form" onclick="switchMobileTab('form')">
+      <i data-lucide="phone-call"></i>
+      <span>Log Call</span>
+    </button>
+    <button class="nav-tab" id="nav-btn-history" onclick="switchMobileTab('history')">
+      <i data-lucide="clock"></i>
+      <span>History</span>
+    </button>
+    <button class="nav-tab nav-sync" id="nav-btn-sync" onclick="fetchRemoteLogs(); fetchCentralLeadQueue();">
+      <i data-lucide="refresh-cw"></i>
+      <span>Sync</span>
+    </button>
+    <button class="nav-tab nav-lock" id="nav-btn-logout" onclick="logoutCaller()">
+      <i data-lucide="lock"></i>
+      <span>Lock</span>
+    </button>
+  </nav>
+
+</div><!-- end app-shell -->
+
+<!-- =============================================
+     ⚙️ SETTINGS MODAL
+     ============================================= -->
+<div class="modal-overlay hidden-modal" id="settings-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3><i data-lucide="settings"></i> Google Sheets Setup</h3>
+      <button class="modal-close-btn" onclick="closeSettings()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.85rem;color:#64748b;margin-bottom:1rem;">Paste your Google Apps Script Web App URL below. All callers will sync to the same sheet automatically.</p>
+      <div class="form-field">
+        <label>Web App URL</label>
+        <input type="url" id="web-app-url" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;">
+        <button type="button" class="btn-outline" id="test-conn-btn" onclick="testSheetConnection()">Test Connection</button>
+        <span id="test-conn-status" class="test-status-text"></span>
       </div>
     </div>
+    <div class="modal-foot">
+      <button type="button" class="btn-outline" onclick="closeSettings()">Cancel</button>
+      <button type="button" class="save-btn-sm" onclick="saveSettings()">Save</button>
+    </div>
   </div>
+</div>
+
+<!-- =============================================
+     📊 CALLS AUDIT MODAL
+     ============================================= -->
+<div class="modal-overlay hidden-modal" id="calls-audit-modal">
+  <div class="modal-box modal-large">
+    <div class="modal-head">
+      <h3 id="calls-audit-modal-title">Call Details</h3>
+      <button class="modal-close-btn" onclick="closeCallsAuditModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" id="calls-audit-modal-body" style="max-height:70vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- =============================================
+     🔔 TOAST NOTIFICATION CONTAINER
+     ============================================= -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- Scripts -->
+<script src="app.js"></script>
 
 </body>
 </html>
