@@ -1633,42 +1633,29 @@ async function syncCentralLeadQueue(newLeads) {
 async function fetchCentralLeadQueue() {
   if (!sheetUrl) return;
   try {
-    const callbackName = "handleCentralQueueFallback";
+    const callbackName = "handleCentralQueueFallback_" + Date.now();
     window[callbackName] = function(data) {
       if (data && data.status === "success" && data.queue) {
         mergeLeadQueue(data.queue);
         saveLeadQueueToLocalStorage();
         renderLeadQueue();
+        showToast("Leads Updated", `Loaded ${data.queue.length} central leads!`, "success");
       }
+      delete window[callbackName];
     };
 
-    if (window.location.protocol === "file:") {
-      const scriptTag = document.createElement("script");
-      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue&callback=" + callbackName + "&_t=" + Date.now();
-      scriptTag.onload = () => scriptTag.remove();
-      scriptTag.onerror = () => scriptTag.remove();
-      document.body.appendChild(scriptTag);
-      return;
-    }
+    // Always use script tag injection (JSONP) for 100% reliable cross-origin loading on mobile browsers
+    const oldScripts = document.querySelectorAll("script[data-queue-script='true']");
+    oldScripts.forEach(s => s.remove());
 
-    const fetchUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue";
-    const response = await fetch(fetchUrl, { method: "GET", mode: "cors" });
-    if (response.ok) {
-      const data = await response.json();
-      if (data.status === "success" && data.queue) {
-        mergeLeadQueue(data.queue);
-        saveLeadQueueToLocalStorage();
-        renderLeadQueue();
-      }
-    }
+    const scriptTag = document.createElement("script");
+    scriptTag.setAttribute("data-queue-script", "true");
+    scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue&callback=" + callbackName + "&_t=" + Date.now();
+    scriptTag.onload = () => scriptTag.remove();
+    scriptTag.onerror = () => scriptTag.remove();
+    document.body.appendChild(scriptTag);
   } catch (err) {
-    console.warn("Could not fetch remote lead queue directly, attempting script fallback:", err);
-    try {
-      const scriptTag = document.createElement("script");
-      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue&callback=handleCentralQueueFallback&_t=" + Date.now();
-      scriptTag.onload = () => scriptTag.remove();
-      document.body.appendChild(scriptTag);
-    } catch(e) {}
+    console.warn("Could not fetch remote lead queue:", err);
   }
 }
 
