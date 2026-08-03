@@ -1667,18 +1667,19 @@ function mergeLeadQueue(remoteQueue) {
   const map = new Map();
   // Add remote queue items first so fresh central leads overwrite stale local cache
   remoteQueue.forEach((item, idx) => {
-    if (item && item.mobile) {
-      const mob = String(item.mobile).replace(/[^0-9]/g, "");
+    if (item) {
+      const mob = item.mobile ? String(item.mobile).replace(/[^0-9]/g, "") : "";
+      const key = mob || item.id || `lead_key_${idx}`;
       const cleanItem = {
         id: item.id || `lead_remote_${idx}_${Date.now()}`,
         name: item.name || `Lead ${idx + 1}`,
-        mobile: mob,
+        mobile: mob || "N/A",
         age: item.age || "",
         gender: item.gender || "",
         city: item.city || "",
         status: item.status || "Pending"
       };
-      map.set(mob, cleanItem);
+      map.set(key, cleanItem);
     }
   });
   // Preserve any local call status updates
