@@ -1689,20 +1689,20 @@ button {
 
   /* Mobile bottom tab navigation bar */
   .mobile-nav-bar {
-    display: flex;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     height: 60px;
-    background-color: rgba(255, 255, 255, 0.85);
+    background-color: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-top: 1px solid var(--border-color);
-    justify-content: space-around;
     align-items: center;
-    z-index: 999;
-    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.05);
+    z-index: 9999;
+    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.08);
     padding-bottom: env(safe-area-inset-bottom);
   }
 
@@ -1714,12 +1714,12 @@ button {
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     font-weight: 500;
-    padding: 0.3rem 0.5rem;
-    gap: 0.15rem;
+    padding: 0.2rem;
+    gap: 0.1rem;
     cursor: pointer;
-    width: 90px;
+    width: 100%;
     transition: var(--transition-smooth);
     border-radius: var(--radius-md);
   }
