@@ -1491,10 +1491,22 @@ function triggerWhatsAppChat(targetMobile = null, targetName = "") {
 }
 
 // --- 📊 Excel/CSV Lead Upload & Calling Queue Engine ---
-function handleExcelUpload(event) {
+async function handleExcelUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
+  // Ensure it's actually an Excel or CSV file (prevents junk from images)
+  const validExtensions = ['.xlsx', '.xls', '.csv'];
+  const fileName = file.name.toLowerCase();
+  const isValid = validExtensions.some(ext => fileName.endsWith(ext));
+  
+  if (!isValid) {
+    showToast("Invalid File", "Please upload a valid Excel (.xlsx, .xls) or CSV file. Images are not supported.", "error");
+    event.target.value = "";
+    return;
+  }
+
+  showToast("Uploading...", "Reading your file, please wait...", "info");
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
