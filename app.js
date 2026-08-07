@@ -1633,26 +1633,31 @@ async function handleExcelUpload(event) {
         let city = "";
         let category = "";
 
+        const nameAliases = ["customer name", "name", "client name", "full name", "client", "customer", "lead name", "lead", "doctor name", "doctor", "name of doctor", "party name", "party", "company name", "company", "firm name", "firm", "contact person", "contact name", "dealer name", "dealer", "agency name", "agency", "owner name", "owner", "business name", "business", "shop name", "shop", "store name", "name of client", "name of customer", "title"];
+        const phoneAliases = ["mobile number", "mobile", "phone", "phone number", "contact", "contact number", "cell", "telephone", "mobile no", "phone no", "mobile_no", "mob", "number"];
+        const stateCityNames = ["west bengal", "maharashtra", "delhi", "gujarat", "karnataka", "tamil nadu", "bihar", "kolkata", "mumbai", "india", "state"];
+
         for (let k of rowKeys) {
           const cleanK = k.toLowerCase().trim();
           const val = sanitizeText(row[k]);
           if (!val) continue;
 
-          if (["customer name", "name", "client name", "full name", "client", "customer", "lead name", "lead", "doctor name", "doctor"].includes(cleanK)) {
+          if (nameAliases.some(alias => cleanK === alias || cleanK.includes(alias))) {
             if (!name) name = val;
-          } else if (["mobile number", "mobile", "phone", "phone number", "contact", "contact number", "cell", "telephone", "mobile no", "phone no", "mobile_no", "mob", "number"].includes(cleanK)) {
+          } else if (phoneAliases.some(alias => cleanK === alias || cleanK.includes(alias))) {
             if (!mobileRaw) mobileRaw = val;
           } else if (["age", "customer age"].includes(cleanK)) {
             if (!age) age = val;
           } else if (["gender", "sex"].includes(cleanK)) {
             if (!gender) gender = val;
-          } else if (["city", "location", "area"].includes(cleanK)) {
+          } else if (["city", "location", "area", "state"].includes(cleanK)) {
             if (!city) city = val;
           } else if (["category", "speciality", "specialization", "specialty", "type", "doctor type", "doc type", "segment"].includes(cleanK)) {
             if (!category) category = val;
           }
         }
 
+        // Fallback for Mobile Number: scan all cells for 10-13 digit numbers
         if (!mobileRaw) {
           for (let k of rowKeys) {
             const valStr = String(row[k]).trim();
@@ -1664,10 +1669,13 @@ async function handleExcelUpload(event) {
           }
         }
 
+        // Fallback for Name: pick first text cell that is NOT a mobile number and NOT a state name
         if (!name) {
           for (let k of rowKeys) {
             const valStr = sanitizeText(row[k]);
-            if (valStr && valStr !== mobileRaw && isNaN(valStr) && valStr.length > 1) {
+            const lowerVal = valStr.toLowerCase();
+            const isStateName = stateCityNames.some(s => lowerVal.includes(s));
+            if (valStr && valStr !== mobileRaw && isNaN(valStr) && valStr.length > 1 && !isStateName) {
               name = valStr;
               break;
             }
