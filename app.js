@@ -1483,7 +1483,7 @@ function triggerWhatsAppChat(targetMobile = null, targetName = "") {
   }
   
   const greeting = name ? `Hello ${name}, ` : "Hello, ";
-  const defaultMsg = encodeURIComponent(`${greeting}following up from Allied Services regarding your query.`);
+  const defaultMsg = encodeURIComponent(`${greeting}thanks for giving us time. Please save this number for further communication regarding your investment plan.`);
   
   const waUrl = `https://wa.me/${cleanMobile}?text=${defaultMsg}`;
   window.open(waUrl, '_blank');
