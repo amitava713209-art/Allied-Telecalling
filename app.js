@@ -1730,7 +1730,8 @@ async function handleExcelUpload(event) {
 }
 
 async function syncCentralLeadQueue(newLeads, replace = false) {
-  if (!sheetUrl || !newLeads || newLeads.length === 0) return;
+  if (!sheetUrl) return;
+  if (!replace && (!newLeads || newLeads.length === 0)) return;
   try {
     await fetch(sheetUrl, {
       method: "POST",
@@ -1739,10 +1740,10 @@ async function syncCentralLeadQueue(newLeads, replace = false) {
       body: JSON.stringify({
         action: "upload_queue",
         replace: replace,    // true = clear old leads first, false = add new leads alongside old
-        leads: newLeads
+        leads: newLeads || []
       })
     });
-    console.log(`Lead queue synced: ${newLeads.length} leads (replace=${replace}).`);
+    console.log(`Lead queue synced: ${newLeads ? newLeads.length : 0} leads (replace=${replace}).`);
   } catch (err) {
     console.warn("Could not sync central lead queue:", err);
   }
