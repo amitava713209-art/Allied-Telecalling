@@ -131,8 +131,8 @@ function doPost(e) {
 
       // Write header row if sheet is empty
       if (queueSheet.getLastRow() === 0) {
-        queueSheet.appendRow(["ID", "Name", "Mobile Number", "Age", "Gender", "City", "Category", "Status"]);
-        queueSheet.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
+        queueSheet.appendRow(["ID", "Name", "Mobile Number", "Age", "Gender", "City", "Category", "Source File", "Status"]);
+        queueSheet.getRange(1, 1, 1, 9).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
       }
 
       // ✅ REPLACE MODE: Clear all old leads first (Admin explicitly chose full refresh)
@@ -172,13 +172,14 @@ function doPost(e) {
             lead.gender || "",
             lead.city || "",
             lead.category || "",
+            lead.sourceFile || "General",
             lead.status || "Pending"
           ]);
         }
       });
 
       if (newRows.length > 0) {
-        queueSheet.getRange(queueSheet.getLastRow() + 1, 1, newRows.length, 8).setValues(newRows);
+        queueSheet.getRange(queueSheet.getLastRow() + 1, 1, newRows.length, 9).setValues(newRows);
       }
 
       return ContentService.createTextOutput(JSON.stringify({
@@ -446,8 +447,9 @@ function doGet(e) {
               age: r[3] || "",
               gender: r[4] || "",
               city: r[5] || "",
-              category: (qLastCol >= 8 && r[6]) ? r[6].toString() : "",  // col 6 = Category
-              status: (qLastCol >= 8 ? r[7] : r[6]) || "Pending"         // col 7 = Status
+              category: (qLastCol >= 8 && r[6]) ? r[6].toString() : "",       // col 6 = Category
+              sourceFile: (qLastCol >= 9 && r[7]) ? r[7].toString() : "General", // col 7 = Source File / Directory
+              status: (qLastCol >= 9 ? r[8] : (qLastCol >= 8 ? r[7] : r[6])) || "Pending" // col 8 = Status
             });
           }
         });

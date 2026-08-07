@@ -7,6 +7,7 @@
 // --- Global Application State ---
 let callLogs = [];
 let leadQueue = [];
+let activeBatchDirectory = "ALL";
 let mediaRecorder = null;
 let audioChunks = [];
 let recordedAudioBase64 = null;
@@ -114,6 +115,17 @@ function loadStoredData() {
     } else {
       leadQueue = [];
     }
+
+    // One-time Queue Reset: Flush corrupted pending leads so team starts 100% fresh with Directory
+    if (localStorage.getItem("telecaller_queue_v4_flushed") !== "TRUE") {
+      leadQueue = [];
+      localStorage.setItem("telecaller_lead_queue", JSON.stringify([]));
+      localStorage.setItem("telecaller_queue_v4_flushed", "TRUE");
+      setTimeout(() => {
+        syncCentralLeadQueue([], true);
+      }, 1200);
+    }
+
     // Prioritize DEFAULT_SHEET_URL so callers never have to configure anything manually
     sheetUrl = DEFAULT_SHEET_URL || localStorage.getItem("telecaller_sheet_url") || "";
   } catch (error) {
@@ -1490,23 +1502,111 @@ function triggerWhatsAppChat(targetMobile = null, targetName = "") {
   showToast("WhatsApp Direct", `Opening WhatsApp chat with +${cleanMobile}.`, "success");
 }
 
-// --- 📊 Excel/CSV Lead Upload & Calling Queue Engine ---
+// Helper to strip non-printable/corrupted symbols
+function sanitizeText(str) {
+  if (!str) return "";
+  let clean = String(str).replace(/[^\x20-\x7E\t\r\n]/g, " ").trim();
+  clean = clean.replace(/\s+/g, " ");
+  if (clean.length > 60) clean = clean.substring(0, 60);
+  return clean;
+}
+
+function switchLeadDirectory(dirName) {
+  activeBatchDirectory = dirName || "ALL";
+  renderLeadQueue();
+}
+
+// --- 📊 Excel/CSV/Image Lead Upload & Directory Engine ---
 async function handleExcelUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  // Ensure it's actually an Excel or CSV file (prevents junk from images)
-  const validExtensions = ['.xlsx', '.xls', '.csv'];
+  const validExtensions = ['.xlsx', '.xls', '.csv', '.png', '.jpg', '.jpeg'];
   const fileName = file.name.toLowerCase();
   const isValid = validExtensions.some(ext => fileName.endsWith(ext));
   
   if (!isValid) {
-    showToast("Invalid File", "Please upload a valid Excel (.xlsx, .xls) or CSV file. Images are not supported.", "error");
+    showToast("Invalid File", "Please upload an Excel (.xlsx, .csv) or Image (.png, .jpg) file.", "error");
     event.target.value = "";
     return;
   }
 
-  showToast("Uploading...", "Reading your file, please wait...", "info");
+  // 1. Prompt Admin for Custom Directory / Campaign Name
+  const defaultDirName = file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9\s_-]/g, " ").trim();
+  const promptVal = prompt("🏷️ Enter Lead Directory / Campaign Name:\n(This will group your leads into a dedicated directory)", defaultDirName);
+  
+  if (promptVal === null) {
+    event.target.value = "";
+    return; // Cancelled
+  }
+
+  const directoryName = sanitizeText(promptVal).trim() || defaultDirName || "General Batch";
+  const isImage = ['.png', '.jpg', '.jpeg'].some(ext => fileName.endsWith(ext));
+
+  // --- IMAGE SCANNING OCR ENGINE ---
+  if (isImage) {
+    showToast("OCR Scanning...", "Reading leads and numbers from image sheet...", "info");
+    try {
+      if (typeof Tesseract === "undefined") {
+        showToast("OCR Engine", "Tesseract is loading, please try again in 3 seconds.", "error");
+        return;
+      }
+      const ret = await Tesseract.recognize(file, 'eng');
+      const text = ret.data.text || "";
+      const lines = text.split(/\r?\n/);
+      let parsedCount = 0;
+      const newQueue = [];
+
+      lines.forEach((line, index) => {
+        const cleanLine = sanitizeText(line);
+        const mobMatch = cleanLine.match(/\b([6-9]\d{9})\b/);
+        if (mobMatch) {
+          const mob = mobMatch[1];
+          let candName = cleanLine.replace(mob, "").replace(/[^a-zA-Z\s]/g, " ").trim();
+          candName = candName.replace(/\s+/g, " ");
+          if (!candName || candName.length < 2) {
+            candName = `Image Lead ${parsedCount + 1}`;
+          }
+
+          newQueue.push({
+            id: `lead_ocr_${Date.now()}_${index}`,
+            name: candName,
+            mobile: mob,
+            category: "Image Scan",
+            sourceFile: directoryName,
+            status: "Pending"
+          });
+          parsedCount++;
+        }
+      });
+
+      if (parsedCount === 0) {
+        showToast("No Mobile Numbers", "Could not detect clear 10-digit mobile numbers in the image.", "error");
+        return;
+      }
+
+      const existingMobiles = new Set(leadQueue.map(l => String(l.mobile)));
+      const dedupedNew = newQueue.filter(l => !existingMobiles.has(String(l.mobile)));
+
+      leadQueue = [...dedupedNew, ...leadQueue];
+      activeBatchDirectory = directoryName; // switch directory
+      saveLeadQueueToLocalStorage();
+      renderLeadQueue();
+      syncCentralLeadQueue(dedupedNew, false);
+
+      showToast("✅ Image Directory Created", `Loaded ${dedupedNew.length} leads into directory "${directoryName}"!`, "success");
+
+    } catch (ocrErr) {
+      console.error("OCR Error:", ocrErr);
+      showToast("OCR Failed", "Failed to parse image. Please ensure text is clear.", "error");
+    } finally {
+      event.target.value = "";
+    }
+    return;
+  }
+
+  // --- EXCEL / CSV PARSER ---
+  showToast("Uploading...", "Reading spreadsheet file, please wait...", "info");
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
@@ -1533,10 +1633,9 @@ async function handleExcelUpload(event) {
         let city = "";
         let category = "";
 
-        // 1. Try finding explicit header matches first
         for (let k of rowKeys) {
           const cleanK = k.toLowerCase().trim();
-          const val = String(row[k]).trim();
+          const val = sanitizeText(row[k]);
           if (!val) continue;
 
           if (["customer name", "name", "client name", "full name", "client", "customer", "lead name", "lead", "doctor name", "doctor"].includes(cleanK)) {
@@ -1554,7 +1653,6 @@ async function handleExcelUpload(event) {
           }
         }
 
-        // 2. Ultra-smart fallback: scan ALL cell values for phone numbers
         if (!mobileRaw) {
           for (let k of rowKeys) {
             const valStr = String(row[k]).trim();
@@ -1566,10 +1664,9 @@ async function handleExcelUpload(event) {
           }
         }
 
-        // 3. Fallback for Name: pick first non-numeric text cell
         if (!name) {
           for (let k of rowKeys) {
-            const valStr = String(row[k]).trim();
+            const valStr = sanitizeText(row[k]);
             if (valStr && valStr !== mobileRaw && isNaN(valStr) && valStr.length > 1) {
               name = valStr;
               break;
@@ -1577,7 +1674,6 @@ async function handleExcelUpload(event) {
           }
         }
 
-        // Clean extracted mobile number
         let mobile = mobileRaw.replace(/[^0-9]/g, "");
         if (mobile.length === 12 && mobile.startsWith("91")) {
           mobile = mobile.slice(2);
@@ -1588,12 +1684,13 @@ async function handleExcelUpload(event) {
         if (mobile.length === 10) {
           newQueue.push({
             id: `lead_${Date.now()}_${index}`,
-            name: name || `Lead ${parsedCount + 1}`,
+            name: sanitizeText(name) || `Lead ${parsedCount + 1}`,
             mobile: mobile,
-            age: age || "",
-            gender: gender || "",
-            city: city || "",
-            category: category || "",
+            age: sanitizeText(age),
+            gender: sanitizeText(gender),
+            city: sanitizeText(city),
+            category: sanitizeText(category),
+            sourceFile: directoryName,
             status: "Pending"
           });
           parsedCount++;
@@ -1605,27 +1702,25 @@ async function handleExcelUpload(event) {
         return;
       }
 
-      // New leads go to TOP — old leads stay below. Deduplicate by mobile number.
       const existingMobiles = new Set(leadQueue.map(l => String(l.mobile)));
       const dedupedNew = newQueue.filter(l => !existingMobiles.has(String(l.mobile)));
       const skipped = parsedCount - dedupedNew.length;
 
-      leadQueue = [...dedupedNew, ...leadQueue];   // ← new at top, old preserved below
+      leadQueue = [...dedupedNew, ...leadQueue];
+      activeBatchDirectory = directoryName; // switch to newly uploaded directory
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
 
-      // Push new leads to Google Sheets (merge mode = false, so it adds to Sheets)
       syncCentralLeadQueue(dedupedNew, false);
 
       const msg = skipped > 0
-        ? `${dedupedNew.length} new leads added to top. ${skipped} duplicates skipped.`
-        : `${dedupedNew.length} leads added to the top of the queue!`;
-      showToast("✅ Leads Added", msg, "success");
-
+        ? `${dedupedNew.length} new leads added to directory "${directoryName}". ${skipped} duplicates skipped.`
+        : `${dedupedNew.length} leads added to directory "${directoryName}"!`;
+      showToast("✅ Directory Created", msg, "success");
 
     } catch (err) {
       console.error("Excel parse error:", err);
-      showToast("Import Failed", "Failed to parse Excel file. Please upload a valid .xlsx or .csv file.", "error");
+      showToast("Import Failed", "Failed to parse Excel file. Please upload a valid file.", "error");
     } finally {
       event.target.value = "";
     }
@@ -1696,12 +1791,13 @@ function mergeLeadQueue(remoteQueue) {
       const key = mob || item.id || `lead_key_${idx}`;
       const cleanItem = {
         id: item.id || `lead_remote_${idx}_${Date.now()}`,
-        name: item.name || `Lead ${idx + 1}`,
+        name: sanitizeText(item.name) || `Lead ${idx + 1}`,
         mobile: mob || "N/A",
-        age: item.age || "",
-        gender: item.gender || "",
-        city: item.city || "",
-        category: item.category || "",   // ← preserve Category from Excel
+        age: sanitizeText(item.age),
+        gender: sanitizeText(item.gender),
+        city: sanitizeText(item.city),
+        category: sanitizeText(item.category),
+        sourceFile: sanitizeText(item.sourceFile) || "General Batch",
         status: item.status || "Pending"
       };
       map.set(key, cleanItem);
@@ -1725,6 +1821,7 @@ function saveLeadQueueToLocalStorage() {
 function clearLeadQueue() {
   if (confirm("Are you sure you want to clear all imported leads from the queue?")) {
     leadQueue = [];
+    activeBatchDirectory = "ALL";
     saveLeadQueueToLocalStorage();
     renderLeadQueue();
     syncCentralLeadQueue([], true);
@@ -1735,27 +1832,58 @@ function clearLeadQueue() {
 function renderLeadQueue(leadsToShow) {
   const container = document.getElementById('lead-queue-container');
   const badge = document.getElementById('queue-badge-count');
+  const dirSelect = document.getElementById('batch-directory-select');
   if (!container) return;
 
-  const displayList = leadsToShow !== undefined ? leadsToShow : leadQueue;
+  // 1. Populate Lead Directory Selector Dropdown
+  if (dirSelect) {
+    const dirCounts = {};
+    leadQueue.forEach(l => {
+      const src = l.sourceFile || "General Batch";
+      dirCounts[src] = (dirCounts[src] || 0) + 1;
+    });
+
+    const previousSelection = dirSelect.value || activeBatchDirectory;
+    dirSelect.innerHTML = `<option value="ALL">📂 All Lead Directories (${leadQueue.length} total)</option>`;
+    
+    Object.keys(dirCounts).sort().forEach(dirName => {
+      const opt = document.createElement('option');
+      opt.value = dirName;
+      opt.textContent = `📂 ${dirName} (${dirCounts[dirName]} leads)`;
+      dirSelect.appendChild(opt);
+    });
+
+    if (Object.keys(dirCounts).includes(previousSelection) || previousSelection === "ALL") {
+      dirSelect.value = previousSelection;
+    } else {
+      dirSelect.value = "ALL";
+    }
+    activeBatchDirectory = dirSelect.value;
+  }
+
+  // 2. Filter list by Directory & Search Query
+  let displayList = leadsToShow !== undefined ? leadsToShow : leadQueue;
+  if (activeBatchDirectory && activeBatchDirectory !== "ALL") {
+    displayList = displayList.filter(l => (l.sourceFile || "General Batch") === activeBatchDirectory);
+  }
 
   if (badge) {
-    const pendingCount = leadQueue.filter(l => l.status === 'Pending').length;
-    badge.textContent = `${pendingCount} / ${leadQueue.length} Pending`;
+    const pendingCount = displayList.filter(l => l.status === 'Pending').length;
+    badge.textContent = `${pendingCount} / ${displayList.length} Pending`;
   }
 
   if (displayList.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <i data-lucide="users" style="width:40px;height:40px;color:#94a3b8;"></i>
-        <p>${leadQueue.length === 0 ? 'Tap <strong>Sync</strong> below or upload an Excel file to load Doctor leads' : 'No leads match your search'}</p>
+        <p>${leadQueue.length === 0 ? 'Tap <strong>Sync</strong> below or upload a file to load your Lead Directory' : 'No leads found in this directory'}</p>
       </div>
     `;
     if (window.lucide) window.lucide.createIcons();
     return;
   }
 
-  // Limit to 100 for performance
+  // Limit to 100 visible cards for fast performance
   const visibleLeads = displayList.slice(0, 100);
   container.innerHTML = '';
 
@@ -1769,10 +1897,11 @@ function renderLeadQueue(leadsToShow) {
     const statusText = isCalled ? 'Called ✓' : (isHot ? '🔥 Hot List' : 'Pending');
     const statusClass = isCalled ? 'badge-called' : (isHot ? 'badge-hot' : 'badge-pending');
 
-    // Build meta tags: mobile + category
+    // Build meta tags: mobile + category + city + directory badge
     let metaTags = `<span class="lead-tag">📞 ${escapeHtml(String(lead.mobile))}</span>`;
     if (lead.category) metaTags += `<span class="lead-tag category-tag">🏷 ${escapeHtml(lead.category)}</span>`;
     if (lead.city) metaTags += `<span class="lead-tag">📍 ${escapeHtml(lead.city)}</span>`;
+    if (lead.sourceFile) metaTags += `<span class="card-dir-badge">📂 ${escapeHtml(lead.sourceFile)}</span>`;
 
     card.innerHTML = `
       <div class="lead-card-top">

@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
   <link rel="manifest" href="manifest.json">
@@ -95,6 +96,17 @@
     <!-- ===== TAB 1: LEAD QUEUE ===== -->
     <section id="tab-queue" class="tab-panel active-panel" data-panel="queue">
 
+      <!-- Directory Selector Header Bar -->
+      <div class="directory-bar">
+        <div class="dir-title-box">
+          <i data-lucide="folder-open" class="dir-icon"></i>
+          <span class="dir-label">Directory:</span>
+        </div>
+        <select id="batch-directory-select" class="dir-select" onchange="switchLeadDirectory(this.value)">
+          <option value="ALL">📂 All Lead Directories (Combined)</option>
+        </select>
+      </div>
+
       <div class="panel-toolbar">
         <input type="search" id="lead-search-input" class="search-box" placeholder="🔍 Search doctor name or number..." oninput="filterLeadQueue(this.value)">
         <div class="toolbar-actions">
@@ -102,10 +114,10 @@
           <button id="clear-queue-btn" type="button" class="upload-btn" onclick="clearLeadQueue()" title="Clear Lead Queue" style="background:#fee2e2; color:#dc2626; border-color:#fca5a5; display:none;">
             <i data-lucide="trash-2"></i>
           </button>
-          <label for="excel-file-input" class="upload-btn" title="Upload Excel or CSV">
+          <label for="excel-file-input" class="upload-btn" title="Upload Excel, CSV, or Image Sheet">
             <i data-lucide="upload-cloud"></i>
           </label>
-          <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" onchange="handleExcelUpload(event)" style="display:none">
+          <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv,.png,.jpg,.jpeg" onchange="handleExcelUpload(event)" style="display:none">
         </div>
       </div>
 
