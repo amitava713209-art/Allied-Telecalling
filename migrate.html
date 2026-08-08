@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Firebase Migration Tool</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: 0 auto; line-height: 1.6; }
+    .dropzone { border: 2px dashed #4f46e5; border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 2rem; background: #f8fafc; cursor: pointer; }
+    .dropzone:hover { background: #e0e7ff; }
+    h1 { color: #1e293b; }
+    .success { color: #059669; font-weight: bold; }
+    .error { color: #dc2626; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Allied Calling — Firebase Migration</h1>
+  <p>Instructions: Export your Google Sheets tabs as CSV files. Drag and drop them here one by one.</p>
+
+  <div class="dropzone" id="users-drop">
+    <h3>1. Drop "Users.csv" here</h3>
+  </div>
+
+  <div class="dropzone" id="leads-drop">
+    <h3>2. Drop "Lead Queue.csv" here</h3>
+  </div>
+
+  <div class="dropzone" id="logs-drop">
+    <h3>3. Drop "Call Logs.csv" here</h3>
+  </div>
+
+  <div id="status"></div>
+
+  <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyClDshgmFBrT4nc-CyyGkPTVHWL2MDnals",
+      authDomain: "allied-calling.firebaseapp.com",
+      projectId: "allied-calling",
+      storageBucket: "allied-calling.firebasestorage.app",
+      messagingSenderId: "739358896582",
+      appId: "1:739358896582:web:6912d108eb35990a1282c7"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const statusEl = document.getElementById('status');
+    function showMsg(msg, isErr=false) {
+      statusEl.innerHTML += `<p class="${isErr ? 'error' : 'success'}">${msg}</p>`;
+    }
+
+    function setupDropzone(id, collectionName, mapper) {
+      const el = document.getElementById(id);
+      el.addEventListener('dragover', e => { e.preventDefault(); el.style.background = '#e0e7ff'; });
+      el.addEventListener('dragleave', e => { e.preventDefault(); el.style.background = '#f8fafc'; });
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        el.style.background = '#f8fafc';
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        
+        showMsg(`Processing ${file.name} for ${collectionName}...`);
+        
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async function(results) {
+            const data = results.data;
+            showMsg(`Found ${data.length} records. Uploading...`);
+            let count = 0;
+            const batch = db.batch();
+            
+            for (let i = 0; i < data.length; i++) {
+              const docData = mapper(data[i]);
+              if (!docData) continue;
+              
+              let docRef;
+              if (collectionName === 'users' && docData.name) {
+                docRef = db.collection('users').doc(docData.name.toLowerCase());
+              } else {
+                docRef = db.collection(collectionName).doc();
+              }
+              
+              batch.set(docRef, docData);
+              count++;
+              
+              // Firestore limits batches to 500 operations
+              if (count % 400 === 0) {
+                await batch.commit();
+                showMsg(`Uploaded ${count}...`);
+              }
+            }
+            
+            if (count % 400 !== 0) {
+              await batch.commit();
+            }
+            showMsg(`✅ Finished uploading ${count} records to ${collectionName}!`);
+          },
+          error: function(err) { showMsg(`Error: ${err.message}`, true); }
+        });
+      });
+    }
+
+    // Mappers
+    setupDropzone('users-drop', 'users', row => ({
+      name: row['Caller Name'] || '',
+      pin: row['PIN'] || '',
+      status: row['Status'] || 'Active',
+      role: row['Role'] || 'Caller',
+      boundDevice: row['Bound Device ID'] || ''
+    }));
+
+    setupDropzone('leads-drop', 'leads', row => {
+      if (!row['Mobile Number']) return null;
+      return {
+        id: row['ID'] || `lead_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+        name: row['Name'] || '',
+        mobile: row['Mobile Number'] || '',
+        age: row['Age'] || '',
+        gender: row['Gender'] || '',
+        city: row['City'] || '',
+        category: row['Category'] || '',
+        sourceFile: row['Source File'] || '',
+        status: row['Status'] || 'Pending'
+      };
+    });
+
+    setupDropzone('logs-drop', 'call_logs', row => {
+      if (!row['Customer Name']) return null;
+      return {
+        timestamp: row['Timestamp'] || new Date().toISOString(),
+        callerName: row['Caller Name'] || '',
+        customerName: row['Customer Name'] || '',
+        mobileNumber: row['Mobile Number'] || '',
+        age: row['Age'] || '',
+        gender: row['Gender'] || '',
+        city: row['City'] || '',
+        callResult: row['Call Result'] || '',
+        appointmentDate: row['Appointment Date'] || '',
+        biProduct: row['BI Product'] || '',
+        comments: row['Comments'] || '',
+        audioBase64: row['Audio URL'] || ''
+      };
+    });
+  </script>
+</body>
+</html>
