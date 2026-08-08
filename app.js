@@ -2336,22 +2336,28 @@ async function handleCallerLogin(event) {
   try {
     const callbackName = "handleUserAuthStrict_" + Date.now();
     
-    // Create timeout safety to handle slow network connections without hanging indefinitely
+    // Timeout: 15 seconds. Shows clear message if Google Script is unreachable.
     const authTimeout = setTimeout(() => {
       delete window[callbackName];
+      const stuck = document.querySelector('script[data-auth-script="true"]');
+      if (stuck) stuck.remove();
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
         if (window.lucide) window.lucide.createIcons();
       }
       if (errBox) {
-        errBox.innerText = "⛔ Connection Timeout. Please check your internet connection and try again.";
+        errBox.innerText = "⛔ Server timeout. Check your internet and try again.";
         errBox.classList.remove("hidden");
       }
-    }, 10000);
+    }, 15000);
 
     window[callbackName] = function(data) {
       clearTimeout(authTimeout);
+      // Clean up the script tag now that callback has fired
+      const usedScript = document.querySelector('script[data-auth-script="true"]');
+      if (usedScript) usedScript.remove();
+
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
@@ -2395,6 +2401,7 @@ async function handleCallerLogin(event) {
 
     if (sheetUrl && sheetUrl.includes("script.google.com")) {
       const authScript = document.createElement("script");
+      authScript.setAttribute("data-auth-script", "true");
       const authUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + 
         "action=verify_user&name=" + encodeURIComponent(nameVal) + 
         "&pin=" + encodeURIComponent(pinVal) + 
@@ -2402,7 +2409,7 @@ async function handleCallerLogin(event) {
         "&callback=" + callbackName + 
         "&_t=" + Date.now();
       authScript.src = authUrl;
-      authScript.onload = () => authScript.remove();
+      // Do NOT remove in onload — let the callback remove it after it fires
       authScript.onerror = () => {
         authScript.remove();
         clearTimeout(authTimeout);

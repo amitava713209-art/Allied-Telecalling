@@ -93,22 +93,18 @@ function doPost(e) {
         if (foundUser.status.toLowerCase() !== "active") {
           resObj = { status: "error", authorized: false, message: "Account Revoked. Please contact Admin." };
           logAudit(ss, foundUser.name, "BLOCKED_LOGIN", "Attempted login on revoked account from device: " + reqDeviceId);
-        } else if (foundUser.boundDevice && reqDeviceId && foundUser.boundDevice !== reqDeviceId && foundUser.role !== "Admin") {
-          // Device Mismatch Lockout!
-          resObj = { status: "error", authorized: false, message: "⛔ Unauthorized Device! Your PIN is bound to another phone. Contact Admin." };
-          logAudit(ss, foundUser.name, "UNAUTHORIZED_DEVICE", "Login rejected! PIN used on unauthorized device: " + reqDeviceId + " (Bound: " + foundUser.boundDevice + ")");
         } else {
-          // Bind device on first successful login if empty
-          if (!foundUser.boundDevice && reqDeviceId && foundUserRow !== -1) {
+          // ✅ Always allow login on correct name+PIN — always update device ID to current device
+          if (reqDeviceId && foundUserRow !== -1) {
             userSheet.getRange(foundUserRow, 5).setValue(reqDeviceId);
           }
           if (foundUserRow !== -1) {
             userSheet.getRange(foundUserRow, 6).setValue(Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "dd/MM/yyyy HH:mm:ss"));
           }
-          
           resObj = { status: "success", authorized: true, name: foundUser.name, role: foundUser.role };
           logAudit(ss, foundUser.name, "LOGIN", "Logged into app successfully from device: " + reqDeviceId);
         }
+
       } else {
         resObj = { status: "error", authorized: false, message: "Invalid Name or Security PIN." };
         logAudit(ss, reqName || "Unknown", "FAILED_LOGIN", "Failed PIN attempt from device: " + reqDeviceId);
@@ -406,11 +402,10 @@ function doGet(e) {
         if (foundUser.status.toLowerCase() !== "active") {
           resObj = { status: "error", authorized: false, message: "Account Revoked. Please contact Admin." };
           logAudit(ss, foundUser.name, "BLOCKED_LOGIN", "Attempted login on revoked account.");
-        } else if (foundUser.boundDevice && reqDeviceId && foundUser.boundDevice !== reqDeviceId && foundUser.role !== "Admin") {
-          resObj = { status: "error", authorized: false, message: "⛔ Unauthorized Device! Your PIN is bound to another phone. Contact Admin." };
-          logAudit(ss, foundUser.name, "UNAUTHORIZED_DEVICE", "Login rejected! PIN used on unauthorized device: " + reqDeviceId);
         } else {
-          if (!foundUser.boundDevice && reqDeviceId && foundUserRow !== -1) {
+          // ✅ Always allow login on correct name+PIN — update device ID to current device
+          // (Removes device-lock that caused "Unauthorized Device" loops on mobile)
+          if (reqDeviceId && foundUserRow !== -1) {
             userSheet.getRange(foundUserRow, 5).setValue(reqDeviceId);
           }
           if (foundUserRow !== -1) {
@@ -419,6 +414,7 @@ function doGet(e) {
           resObj = { status: "success", authorized: true, name: foundUser.name, role: foundUser.role };
           logAudit(ss, foundUser.name, "LOGIN", "Logged into app successfully.");
         }
+
       } else {
         resObj = { status: "error", authorized: false, message: "Invalid Name or Security PIN." };
         logAudit(ss, reqName || "Unknown", "FAILED_LOGIN", "Failed PIN attempt.");
