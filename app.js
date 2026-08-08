@@ -1634,9 +1634,11 @@ async function handleExcelUpload(event) {
         let category = "";
 
         const nameAliases = ["customer name", "name", "client name", "full name", "client", "customer", "lead name", "lead", "doctor name", "doctor", "name of doctor", "party name", "party", "company name", "company", "firm name", "firm", "contact person", "contact name", "dealer name", "dealer", "agency name", "agency", "owner name", "owner", "business name", "business", "shop name", "shop", "store name", "name of client", "name of customer", "title"];
-        const phoneAliases = ["mobile number", "mobile", "phone", "phone number", "contact", "contact number", "cell", "telephone", "mobile no", "phone no", "mobile_no", "mob", "number"];
+        const phoneAliases = ["owner mobile number", "owner mobile", "mobile number", "mobile", "phone number", "phone", "contact number", "contact", "cell", "telephone", "mobile no", "phone no", "mobile_no", "mob", "whatsapp", "whatsapp number"];
+        const ignorePhoneHeaders = ["registration", "reg", "chassis", "engine", "policy", "amount", "price", "capacity", "capa", "seat", "pin", "pincode", "zip", "serial", "sl", "id", "model"];
         const stateCityNames = ["west bengal", "maharashtra", "delhi", "gujarat", "karnataka", "tamil nadu", "bihar", "kolkata", "mumbai", "india", "state"];
 
+        // 1. Smart Name & Meta Extraction
         for (let k of rowKeys) {
           const cleanK = k.toLowerCase().trim();
           const val = sanitizeText(row[k]);
@@ -1644,8 +1646,6 @@ async function handleExcelUpload(event) {
 
           if (nameAliases.some(alias => cleanK === alias || cleanK.includes(alias))) {
             if (!name) name = val;
-          } else if (phoneAliases.some(alias => cleanK === alias || cleanK.includes(alias))) {
-            if (!mobileRaw) mobileRaw = val;
           } else if (["age", "customer age"].includes(cleanK)) {
             if (!age) age = val;
           } else if (["gender", "sex"].includes(cleanK)) {
@@ -1657,38 +1657,54 @@ async function handleExcelUpload(event) {
           }
         }
 
-        // Fallback for Mobile Number: scan all cells for 10-13 digit numbers
-        if (!mobileRaw) {
-          for (let k of rowKeys) {
-            const valStr = String(row[k]).trim();
-            const cleanedVal = valStr.replace(/[^0-9]/g, "");
-            if (cleanedVal.length >= 10 && cleanedVal.length <= 13) {
-              mobileRaw = valStr;
+        // 2. Strict Indian Mobile Extractor (Ignores Registration / Serial / Chassis Numbers)
+        let mobile = "";
+        
+        // Step 2A: Check explicit phone header columns first
+        for (let k of rowKeys) {
+          const cleanK = k.toLowerCase().trim();
+          if (ignorePhoneHeaders.some(ig => cleanK.includes(ig))) continue;
+
+          if (phoneAliases.some(alias => cleanK === alias || cleanK.includes(alias))) {
+            const valStr = String(row[k] || "").trim().replace(/[^0-9]/g, "");
+            let cleaned = valStr;
+            if (cleaned.length === 12 && cleaned.startsWith("91")) cleaned = cleaned.slice(2);
+            if (cleaned.length > 10) cleaned = cleaned.slice(-10);
+            if (cleaned.length === 10 && /^[6-9]/.test(cleaned)) {
+              mobile = cleaned;
               break;
             }
           }
         }
 
-        // Fallback for Name: pick first text cell that is NOT a mobile number and NOT a state name
+        // Step 2B: Fallback scan across non-ignored columns for valid 10-digit number starting 6-9
+        if (!mobile) {
+          for (let k of rowKeys) {
+            const cleanK = k.toLowerCase().trim();
+            if (ignorePhoneHeaders.some(ig => cleanK.includes(ig))) continue;
+
+            const valStr = String(row[k] || "").trim().replace(/[^0-9]/g, "");
+            let cleaned = valStr;
+            if (cleaned.length === 12 && cleaned.startsWith("91")) cleaned = cleaned.slice(2);
+            if (cleaned.length > 10) cleaned = cleaned.slice(-10);
+            if (cleaned.length === 10 && /^[6-9]/.test(cleaned)) {
+              mobile = cleaned;
+              break;
+            }
+          }
+        }
+
+        // 3. Fallback for Name: pick first text cell that is NOT a mobile number and NOT a state name
         if (!name) {
           for (let k of rowKeys) {
             const valStr = sanitizeText(row[k]);
             const lowerVal = valStr.toLowerCase();
             const isStateName = stateCityNames.some(s => lowerVal.includes(s));
-            if (valStr && valStr !== mobileRaw && isNaN(valStr) && valStr.length > 1 && !isStateName) {
+            if (valStr && valStr !== mobile && isNaN(valStr) && valStr.length > 1 && !isStateName) {
               name = valStr;
               break;
             }
           }
-        }
-
-        let mobile = mobileRaw.replace(/[^0-9]/g, "");
-        if (mobile.length === 12 && mobile.startsWith("91")) {
-          mobile = mobile.slice(2);
-        } else if (mobile.length > 10) {
-          mobile = mobile.slice(-10);
-        }
-
         if (mobile.length === 10) {
           newQueue.push({
             id: `lead_${Date.now()}_${index}`,
