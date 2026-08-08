@@ -386,8 +386,18 @@
 <!-- Scripts -->
 <script src="app.js"></script>
 <script>
+// ✅ Register Service Worker — required for PWA install prompt on Android/Chrome
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.warn('SW registration failed:', err));
+  });
+}
+
 // PWA Install Prompt Handler
 let deferredInstallPrompt = null;
+
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
