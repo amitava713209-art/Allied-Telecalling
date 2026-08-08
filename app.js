@@ -2224,232 +2224,144 @@ window.addEventListener("resize", () => {
 
 // --- 🔒 SECURITY ACCESS & PIN AUTHENTICATION ENGINE ---
 
-// Generate a stable browser fingerprint that survives localStorage clears
-// Based on immutable device properties: screen, timezone, user agent
+
+// --- DEVICE ID: stable fingerprint from browser properties ---
 function getStableDeviceId() {
   try {
     const ua = navigator.userAgent || '';
-    const screen = (window.screen.width || 0) + 'x' + (window.screen.height || 0);
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-    const lang = navigator.language || '';
-    const raw = ua + '|' + screen + '|' + tz + '|' + lang;
-    // Simple hash
-    let hash = 0;
-    for (let i = 0; i < raw.length; i++) {
-      const char = raw.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    const stableId = 'fp_' + Math.abs(hash).toString(36);
-    // Cache in both storages
-    try { localStorage.setItem('telecaller_device_id', stableId); } catch(e) {}
-    try { sessionStorage.setItem('telecaller_device_id', stableId); } catch(e) {}
-    return stableId;
+    const sc = (window.screen.width || 0) + 'x' + (window.screen.height || 0);
+    const tz = (Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '') || '';
+    const raw = ua + sc + tz;
+    let h = 0;
+    for (let i = 0; i < raw.length; i++) { h = Math.imul(31, h) + raw.charCodeAt(i) | 0; }
+    const id = 'fp_' + Math.abs(h).toString(36);
+    localStorage.setItem('telecaller_device_id', id);
+    return id;
   } catch(e) {
-    // Ultimate fallback: try cached, then generate random once
-    let id = '';
-    try { id = localStorage.getItem('telecaller_device_id') || sessionStorage.getItem('telecaller_device_id') || ''; } catch(e2) {}
-    if (!id) {
-      id = 'dev_' + Math.random().toString(36).substring(2, 10);
-      try { localStorage.setItem('telecaller_device_id', id); } catch(e3) {}
-      try { sessionStorage.setItem('telecaller_device_id', id); } catch(e3) {}
-    }
+    let id = localStorage.getItem('telecaller_device_id') || '';
+    if (!id) { id = 'dev_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('telecaller_device_id', id); }
     return id;
   }
 }
 
+// --- AUTH CHECK: show or hide the login modal ---
 function checkCallerSecurityAccess() {
-  // Read auth token from localStorage first, fall back to sessionStorage
-  let isAuth = false;
-  let callerName = '';
-  let userRole = 'Caller';
-  try {
-    isAuth = localStorage.getItem('telecaller_auth_token') === 'TRUE'
-           || sessionStorage.getItem('telecaller_auth_token') === 'TRUE';
-    callerName = localStorage.getItem('telecaller_agent_name')
-              || sessionStorage.getItem('telecaller_agent_name') || '';
-    userRole = localStorage.getItem('telecaller_user_role')
-             || sessionStorage.getItem('telecaller_user_role') || 'Caller';
-    // Sync back to localStorage in case it was cleared
-    if (isAuth && callerName) {
-      localStorage.setItem('telecaller_auth_token', 'TRUE');
-      localStorage.setItem('telecaller_agent_name', callerName);
-      localStorage.setItem('telecaller_user_role', userRole);
-    }
-  } catch(e) { /* private mode: rely on sessionStorage only */ }
+  const token     = localStorage.getItem('telecaller_auth_token');
+  const name      = localStorage.getItem('telecaller_agent_name');
+  const role      = localStorage.getItem('telecaller_user_role') || 'Caller';
+  const isAuth    = (token === 'TRUE') && name && name.length > 0;
 
-  const modal = document.getElementById('security-auth-modal');
-  const badgeName = document.getElementById('logged-user-name');
+  const modal      = document.getElementById('security-auth-modal');
+  const badgeName  = document.getElementById('logged-user-name');
   const agentInput = document.getElementById('caller-name');
-  const exportBtn = document.getElementById('export-csv-btn');
-  // Upload button — Admin only
-  const uploadLabel = document.querySelector('label[for="excel-file-input"]');
-  const uploadInput = document.getElementById('excel-file-input');
+  const exportBtn  = document.getElementById('export-csv-btn');
+  const uploadLabel= document.querySelector('label[for="excel-file-input"]');
+  const uploadInput= document.getElementById('excel-file-input');
+  const clearBtn   = document.getElementById('clear-queue-btn');
 
-  if (!isAuth || !callerName) {
+  if (!isAuth) {
     if (modal) modal.classList.remove('hidden');
     if (badgeName) badgeName.innerText = 'Locked';
-  } else {
-    if (modal) modal.classList.add('hidden');
-    if (badgeName) badgeName.innerText = callerName + (userRole === 'Admin' ? ' 👑' : '');
-    if (agentInput) agentInput.value = callerName;
-
-    const isAdmin = userRole === 'Admin';
-
-    // Export CSV — Admin only
-    if (exportBtn) exportBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-
-    // Upload & Clear buttons — Admin only
-    const clearBtn = document.getElementById('clear-queue-btn');
-    if (uploadLabel) uploadLabel.style.display = isAdmin ? 'flex' : 'none';
-    if (clearBtn) clearBtn.style.display = isAdmin ? 'flex' : 'none';
-    if (uploadInput) uploadInput.style.display = 'none'; // always hidden, triggered by label
-
-    // Auto-silently fetch leads for ALL users on login
-    fetchCentralLeadQueue();
+    return;
   }
+
+  // ✅ Authenticated — hide modal and set up UI
+  if (modal) modal.classList.add('hidden');
+  if (badgeName) badgeName.innerText = name + (role === 'Admin' ? ' 👑' : '');
+  if (agentInput) agentInput.value = name;
+
+  const isAdmin = (role === 'Admin');
+  if (exportBtn)   exportBtn.style.display   = isAdmin ? 'inline-flex' : 'none';
+  if (uploadLabel) uploadLabel.style.display = isAdmin ? 'flex' : 'none';
+  if (clearBtn)    clearBtn.style.display    = isAdmin ? 'flex' : 'none';
+  if (uploadInput) uploadInput.style.display = 'none';
+
+  fetchCentralLeadQueue();
 }
 
+// --- LOGIN HANDLER ---
 async function handleCallerLogin(event) {
   event.preventDefault();
-  const nameInput = document.getElementById("auth-caller-name");
-  const pinInput = document.getElementById("auth-caller-pin");
-  const errBox = document.getElementById("auth-error-msg");
-  const submitBtn = document.getElementById("auth-submit-btn");
 
-  const nameVal = nameInput ? nameInput.value.trim() : "";
-  const pinVal = pinInput ? pinInput.value.trim() : "";
+  const nameInput = document.getElementById('auth-caller-name');
+  const pinInput  = document.getElementById('auth-caller-pin');
+  const errBox    = document.getElementById('auth-error-msg');
+  const submitBtn = document.getElementById('auth-submit-btn');
+
+  const nameVal = (nameInput ? nameInput.value : '').trim();
+  const pinVal  = (pinInput  ? pinInput.value  : '').trim();
 
   if (!nameVal || !pinVal) return;
 
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = `<i class="input-icon spin-icon" data-lucide="loader-2" style="position:static; margin:0;"></i> Verifying Credentials...`;
-    if (window.lucide) window.lucide.createIcons();
+  // Show loading state
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Verifying...'; }
+  if (errBox)    errBox.classList.add('hidden');
+
+  const deviceId       = getStableDeviceId();
+  const callbackName   = 'authCb_' + Date.now();
+
+  // Build the JSONP URL
+  const authUrl = sheetUrl + '?action=verify_user'
+    + '&name='     + encodeURIComponent(nameVal)
+    + '&pin='      + encodeURIComponent(pinVal)
+    + '&deviceId=' + encodeURIComponent(deviceId)
+    + '&callback=' + callbackName
+    + '&_t='       + Date.now();
+
+  // Timeout: 15 s
+  const timer = setTimeout(function() {
+    cleanup();
+    showErr('⛔ No response from server. Check your internet and try again.');
+  }, 15000);
+
+  function resetBtn() {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i data-lucide="key-round"></i> Unlock Access'; if (window.lucide) window.lucide.createIcons(); }
   }
-  if (errBox) errBox.classList.add("hidden");
+  function showErr(msg) {
+    resetBtn();
+    if (errBox) { errBox.innerText = msg; errBox.classList.remove('hidden'); }
+  }
+  function cleanup() {
+    clearTimeout(timer);
+    delete window[callbackName];
+    const s = document.getElementById('auth-jsonp-script');
+    if (s) s.remove();
+  }
 
-  // Generate stable device fingerprint (same every visit, even after localStorage clear)
-  const deviceId = getStableDeviceId();
+  // Define the callback BEFORE injecting the script
+  window[callbackName] = function(data) {
+    cleanup();
+    resetBtn();
 
-  // --- STRICT PRIOR AUTHENTICATION VERIFICATION ENGINE ---
-  try {
-    const callbackName = "handleUserAuthStrict_" + Date.now();
-    
-    // Timeout: 15 seconds. Shows clear message if Google Script is unreachable.
-    const authTimeout = setTimeout(() => {
-      delete window[callbackName];
-      const stuck = document.querySelector('script[data-auth-script="true"]');
-      if (stuck) stuck.remove();
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
-        if (window.lucide) window.lucide.createIcons();
-      }
-      if (errBox) {
-        errBox.innerText = "⛔ Server timeout. Check your internet and try again.";
-        errBox.classList.remove("hidden");
-      }
-    }, 15000);
-
-    window[callbackName] = function(data) {
-      clearTimeout(authTimeout);
-      // Clean up the script tag now that callback has fired
-      const usedScript = document.querySelector('script[data-auth-script="true"]');
-      if (usedScript) usedScript.remove();
-
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
-        if (window.lucide) window.lucide.createIcons();
-      }
-
-      if (data && data.status === "success" && data.authorized) {
-        // STRICT VERIFICATION PASSED! Unlock app only now.
-        // Write to BOTH storages so auth survives if localStorage is wiped
-        const aName = data.name || nameVal;
-        const aRole = data.role || "Caller";
-        try { localStorage.setItem("telecaller_auth_token", "TRUE"); } catch(e) {}
-        try { localStorage.setItem("telecaller_agent_name", aName); } catch(e) {}
-        try { localStorage.setItem("telecaller_user_role", aRole); } catch(e) {}
-        try { sessionStorage.setItem("telecaller_auth_token", "TRUE"); } catch(e) {}
-        try { sessionStorage.setItem("telecaller_agent_name", aName); } catch(e) {}
-        try { sessionStorage.setItem("telecaller_user_role", aRole); } catch(e) {}
-
-        showToast("Access Granted", `Welcome ${data.name}! System unlocked.`, "success");
-        checkCallerSecurityAccess();
-        fetchRemoteLogs();
-        fetchCentralLeadQueue();
-      } else {
-        // STRICT VERIFICATION FAILED! Keep app 100% locked.
-        try { localStorage.removeItem("telecaller_auth_token"); } catch(e) {}
-        try { localStorage.removeItem("telecaller_agent_name"); } catch(e) {}
-        try { localStorage.removeItem("telecaller_user_role"); } catch(e) {}
-        try { sessionStorage.removeItem("telecaller_auth_token"); } catch(e) {}
-        try { sessionStorage.removeItem("telecaller_agent_name"); } catch(e) {}
-        try { sessionStorage.removeItem("telecaller_user_role"); } catch(e) {}
-        checkCallerSecurityAccess();
-
-        const msg = (data && data.message) ? data.message : "Invalid Name or Security PIN.";
-        if (errBox) {
-          errBox.innerText = "⛔ " + msg;
-          errBox.classList.remove("hidden");
-        }
-      }
-      delete window[callbackName];
-    };
-
-    if (sheetUrl && sheetUrl.includes("script.google.com")) {
-      const authScript = document.createElement("script");
-      authScript.setAttribute("data-auth-script", "true");
-      const authUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + 
-        "action=verify_user&name=" + encodeURIComponent(nameVal) + 
-        "&pin=" + encodeURIComponent(pinVal) + 
-        "&deviceId=" + encodeURIComponent(deviceId) + 
-        "&callback=" + callbackName + 
-        "&_t=" + Date.now();
-      authScript.src = authUrl;
-      // Do NOT remove in onload — let the callback remove it after it fires
-      authScript.onerror = () => {
-        authScript.remove();
-        clearTimeout(authTimeout);
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
-          if (window.lucide) window.lucide.createIcons();
-        }
-        if (errBox) {
-          errBox.innerText = "⛔ Verification failed. Unable to reach security server.";
-          errBox.classList.remove("hidden");
-        }
-      };
-      document.body.appendChild(authScript);
+    if (data && data.status === 'success' && data.authorized === true) {
+      // ✅ SUCCESS — write token then show app
+      const n = data.name || nameVal;
+      const r = data.role || 'Caller';
+      localStorage.setItem('telecaller_auth_token', 'TRUE');
+      localStorage.setItem('telecaller_agent_name', n);
+      localStorage.setItem('telecaller_user_role',  r);
+      showToast('Access Granted', 'Welcome ' + n + '! System unlocked.', 'success');
+      checkCallerSecurityAccess();
+      fetchRemoteLogs();
     } else {
-      clearTimeout(authTimeout);
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
-        if (window.lucide) window.lucide.createIcons();
-      }
-      if (errBox) {
-        errBox.innerText = "⛔ Google Sheet Web App URL not configured.";
-        errBox.classList.remove("hidden");
-      }
+      // ❌ FAILED — clear any stale token and show error
+      localStorage.removeItem('telecaller_auth_token');
+      localStorage.removeItem('telecaller_agent_name');
+      localStorage.removeItem('telecaller_user_role');
+      const msg = (data && data.message) ? data.message : 'Invalid Name or Security PIN.';
+      showErr('⛔ ' + msg);
+      checkCallerSecurityAccess();
     }
+  };
 
-  } catch (err) {
-    console.warn("Strict Auth Error:", err);
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = `<i data-lucide="key-round"></i> Unlock Access`;
-      if (window.lucide) window.lucide.createIcons();
-    }
-    if (errBox) {
-      errBox.innerText = "⛔ Authentication Error. Please try again.";
-      errBox.classList.remove("hidden");
-    }
-  }
+  // Inject JSONP script tag
+  const script  = document.createElement('script');
+  script.id     = 'auth-jsonp-script';
+  script.src    = authUrl;
+  script.onerror= function() { cleanup(); showErr('⛔ Could not reach the server. Check your internet connection.'); };
+  document.body.appendChild(script);
 }
+
 
 function logoutCaller() {
   if (confirm("Are you sure you want to lock and log out of the Telecaller portal?")) {
