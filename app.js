@@ -15,12 +15,22 @@ let recordingTimerInterval = null;
 let recordingSeconds = 0;
 
 // 💡 UNIVERSAL TEAM CONFIGURATION
-// Paste your deployed Google Apps Script Web App URL (ending in "/exec") inside the quotes below.
-// Once you paste your URL here, none of your 10 callers need to configure anything!
-// They will open the link and instantly see "Sheets Connected" automatically.
-const DEFAULT_SHEET_URL = "https://script.google.com/macros/s/AKfycbzi95qPF66gQ97cFCnvnezJdUepq0l8krznJTdhOajXGfqZXrFwwizVOdkQNAY8s-fafg/exec";
+// 💡 UNIVERSAL TEAM CONFIGURATION - FIREBASE
+const firebaseConfig = {
+  apiKey: "AIzaSyClDshgmFBrT4nc-CyyGkPTVHWL2MDnals",
+  authDomain: "allied-calling.firebaseapp.com",
+  projectId: "allied-calling",
+  storageBucket: "allied-calling.firebasestorage.app",
+  messagingSenderId: "739358896582",
+  appId: "1:739358896582:web:6912d108eb35990a1282c7"
+};
 
-let sheetUrl = DEFAULT_SHEET_URL;
+// Initialize Firebase
+if (typeof firebase !== 'undefined') {
+  firebase.initializeApp(firebaseConfig);
+}
+const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
+let sheetUrl = null; // Removed Google Sheets Url
 let editingRecordId = null;
 
 // --- Initialization on DOM Load ---
@@ -295,10 +305,7 @@ function editRecord(recordId) {
 
 // --- Fetch Remote Data Sync Engine (2-Way GET retrieval) ---
 async function fetchRemoteLogs() {
-  if (!sheetUrl) {
-    console.log("Sync skipped: No Sheets URL configured.");
-    return;
-  }
+  if (!db) return;
 
   const refreshBtn = document.getElementById("refresh-sync-btn");
   const refreshIcon = document.getElementById("refresh-icon");
@@ -307,79 +314,22 @@ async function fetchRemoteLogs() {
   if (refreshBtn) refreshBtn.disabled = true;
 
   try {
-    const callbackName = "handleSheetDataFallback_Global";
-    window[callbackName] = function(data) {
-      if (data && data.records && Array.isArray(data.records) && data.records.length > 0) {
-        mergeLogs(data.records);
-        saveLogsToLocalStorage();
-        filterCallHistory();
-        recalculateAnalytics();
-        updateSyncBadge();
-        showToast("Sync Successful", `Fetched ${data.records.length} team logs from Google Sheet.`, "success");
-      }
-    };
-
-    // If opening locally as file://, use script tag injection directly to bypass browser CORS blocks
-    if (window.location.protocol === "file:") {
-      // Remove any existing sync scripts to prevent duplicate callback delays
-      const oldScripts = document.querySelectorAll("script[data-sync-script='true']");
-      oldScripts.forEach(s => s.remove());
-
-      const scriptTag = document.createElement("script");
-      scriptTag.setAttribute("data-sync-script", "true");
-      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=" + callbackName + "&_t=" + Date.now();
-      scriptTag.onload = function() {
-        if (refreshIcon) refreshIcon.classList.remove("spin-icon");
-        if (refreshBtn) refreshBtn.disabled = false;
-        if (scriptTag && scriptTag.parentNode) scriptTag.parentNode.removeChild(scriptTag);
-      };
-      scriptTag.onerror = function() {
-        if (refreshIcon) refreshIcon.classList.remove("spin-icon");
-        if (refreshBtn) refreshBtn.disabled = false;
-        if (scriptTag && scriptTag.parentNode) scriptTag.parentNode.removeChild(scriptTag);
-      };
-      document.body.appendChild(scriptTag);
-      return;
-    }
-
-    // Fetch query with fetch action parameter
-    const fetchUrl = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch";
-    const response = await fetch(fetchUrl, {
-      method: "GET",
-      mode: "cors"
+    const snapshot = await db.collection('call_logs').orderBy('timestamp', 'desc').limit(200).get();
+    const records = [];
+    snapshot.forEach(doc => {
+      records.push({ id: doc.id, ...doc.data() });
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP Error Status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (data.status === "success" && data.records) {
-      // Merge remote spreadsheet data with local logs
-      mergeLogs(data.records);
+    if (records.length > 0) {
+      mergeLogs(records);
       saveLogsToLocalStorage();
       filterCallHistory();
       recalculateAnalytics();
-      
-      // Also fetch shared central Lead Queue tab
-      fetchCentralLeadQueue();
-
-      // Update Sync Badge to show success state
       updateSyncBadge();
-      
-      showToast("Sync Successful", `Fetched ${data.records.length} team logs from Google Sheet.`, "success");
-    } else {
-      throw new Error(data.message || "Invalid data format received.");
+      showToast("Sync Successful", `Fetched ${records.length} team logs from Firebase.`, "success");
     }
   } catch (error) {
-    console.warn("Direct CORS fetch failed, falling back to script injection:", error);
-    try {
-      const scriptTag = document.createElement("script");
-      scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch&callback=handleSheetDataFallback_Global";
-      document.body.appendChild(scriptTag);
-    } catch (e) {
-      console.warn("Fallback failed:", e);
-    }
+    console.warn("Could not fetch remote logs from Firebase:", error);
   } finally {
     if (refreshIcon) refreshIcon.classList.remove("spin-icon");
     if (refreshBtn) refreshBtn.disabled = false;
@@ -528,17 +478,18 @@ async function testSheetConnection() {
 function updateSyncBadge() {
   const syncBtn = document.getElementById("sync-status-btn");
   const syncText = document.getElementById("sync-status-text");
-  if (!syncBtn || !syncText) return;
   
+  if (!syncBtn || !syncText) return;
+
   // Clear any temporary inline styling added during error states
   syncBtn.removeAttribute("style");
   
-  if (sheetUrl) {
+  if (db) {
     syncBtn.className = "status-badge state-connected";
-    syncText.textContent = "Sheets Connected";
+    syncText.textContent = "Firebase Connected";
   } else {
     syncBtn.className = "status-badge state-disconnected";
-    syncText.textContent = "Sheets Offline";
+    syncText.textContent = "Database Offline";
   }
 }
 
@@ -752,8 +703,8 @@ async function triggerSheetSync(recordId) {
 
   const record = callLogs[index];
   
-  if (!sheetUrl) {
-    console.log(`Sheets URL not configured. Record ${record.name} kept as Pending Sync.`);
+  if (!db) {
+    console.log(`Firebase not configured. Record ${record.name} kept as Pending Sync.`);
     return;
   }
 
@@ -761,38 +712,40 @@ async function triggerSheetSync(recordId) {
 
   try {
     const payload = {
-      name: record.name,
-      mobile: record.mobile,
+      timestamp: record.timestamp || new Date().toISOString(),
+      callerName: record.addedBy || "N/A",
+      customerName: record.name,
+      mobileNumber: record.mobile,
       age: record.age || "N/A",
-      gender: record.gender,
-      status: record.status,
-      appointmentGiven: record.appointmentGiven ? "Yes" : "No",
+      gender: record.gender || "",
+      city: record.city || "",
+      callResult: record.status || "",
       appointmentDate: record.appointmentDate ? formatDateTimeReadable(record.appointmentDate) : "N/A",
-      biRequired: record.biRequired ? "Yes" : "No",
       biProduct: record.biProduct || "N/A",
       comments: record.comments || "N/A",
-      addedBy: record.addedBy || "N/A",
-      audioRecording: record.audioRecording || "N/A"
+      audioBase64: record.audioRecording || ""
     };
 
-    // Bypassing browser preflight CORS restrictions on Google Apps Script Web Apps
-    // by using "no-cors" mode universally for all POST sync operations.
-    await fetch(sheetUrl, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify(payload)
-    });
+    // 1. Upload to Call Logs collection
+    await db.collection('call_logs').doc(recordId).set(payload);
+
+    // 2. Update Lead Queue document if mobile matches
+    const leadsSnapshot = await db.collection('leads').where('mobile', '==', record.mobile).get();
+    if (!leadsSnapshot.empty) {
+      const batch = db.batch();
+      leadsSnapshot.forEach(doc => {
+        batch.update(doc.ref, { status: "Called" });
+      });
+      await batch.commit();
+    }
 
     callLogs[index].syncStatus = "Synced";
     saveLogsToLocalStorage();
     updateRecordSyncUiStatus(recordId, "Synced");
-    showToast("Synced to Sheet", `"${record.name}" updated on Google Sheets.`, "success");
+    showToast("Synced to Firebase", `"${record.name}" logged successfully.`, "success");
 
   } catch (error) {
-    console.error("Sheets Sync Error:", error);
+    console.error("Firebase Sync Error:", error);
     callLogs[index].syncStatus = "Pending";
     saveLogsToLocalStorage();
     updateRecordSyncUiStatus(recordId, "Pending");
@@ -1750,57 +1703,73 @@ async function handleExcelUpload(event) {
     }
   };
 
-  reader.readAsArrayBuffer(file);
-}
-
 async function syncCentralLeadQueue(newLeads, replace = false) {
-  if (!sheetUrl) return;
+  if (!db) return;
   if (!replace && (!newLeads || newLeads.length === 0)) return;
+  
   try {
-    await fetch(sheetUrl, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        action: "upload_queue",
-        replace: replace,    // true = clear old leads first, false = add new leads alongside old
-        leads: newLeads || []
-      })
-    });
-    console.log(`Lead queue synced: ${newLeads ? newLeads.length : 0} leads (replace=${replace}).`);
+    const leadsRef = db.collection('leads');
+    
+    if (replace) {
+      // Clear old leads first (max 500 per batch, so we fetch and delete)
+      const snapshot = await leadsRef.get();
+      if (!snapshot.empty) {
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+      }
+    }
+
+    if (newLeads && newLeads.length > 0) {
+      // Add new leads in batches of 400
+      let batch = db.batch();
+      let count = 0;
+
+      for (const lead of newLeads) {
+        const docRef = leadsRef.doc(lead.id || `lead_${Date.now()}_${Math.random().toString(36).substr(2,9)}`);
+        batch.set(docRef, lead);
+        count++;
+
+        if (count === 400) {
+          await batch.commit();
+          batch = db.batch();
+          count = 0;
+        }
+      }
+      if (count > 0) {
+        await batch.commit();
+      }
+    }
+    
+    console.log(`Lead queue synced to Firebase: ${newLeads ? newLeads.length : 0} leads (replace=${replace}).`);
   } catch (err) {
     console.warn("Could not sync central lead queue:", err);
   }
 }
 
-
-
+let unsubscribeLeads = null;
 async function fetchCentralLeadQueue() {
-  if (!sheetUrl) return;
+  if (!db) return;
   try {
-    window.handleCentralQueueFallback_Global = function(data) {
-      if (data && data.status === "success" && data.queue && Array.isArray(data.queue)) {
-        const wasEmpty = leadQueue.length === 0;
-        mergeLeadQueue(data.queue);
-        saveLeadQueueToLocalStorage();
-        renderLeadQueue();
-        // Only show toast on first load; silent refresh otherwise
-        if (wasEmpty && data.queue.length > 0) {
-          showToast("Leads Ready", `${data.queue.length} Doctor leads loaded — start calling!`, "success");
-        }
+    if (unsubscribeLeads) unsubscribeLeads(); // prevent duplicate listeners
+
+    unsubscribeLeads = db.collection('leads').onSnapshot((snapshot) => {
+      const remoteQueue = [];
+      snapshot.forEach(doc => {
+        remoteQueue.push({ id: doc.id, ...doc.data() });
+      });
+      
+      const wasEmpty = leadQueue.length === 0;
+      mergeLeadQueue(remoteQueue);
+      saveLeadQueueToLocalStorage();
+      renderLeadQueue();
+      
+      if (wasEmpty && remoteQueue.length > 0) {
+        showToast("Leads Ready", `${remoteQueue.length} leads loaded - start calling!`, "success");
       }
-    };
-
-    // Always use script tag injection (JSONP) for 100% reliable cross-origin loading on mobile browsers
-    const oldScripts = document.querySelectorAll("script[data-queue-script='true']");
-    oldScripts.forEach(s => s.remove());
-
-    const scriptTag = document.createElement("script");
-    scriptTag.setAttribute("data-queue-script", "true");
-    scriptTag.src = sheetUrl + (sheetUrl.includes("?") ? "&" : "?") + "action=fetch_queue&callback=handleCentralQueueFallback_Global&_t=" + Date.now();
-    scriptTag.onload = () => scriptTag.remove();
-    scriptTag.onerror = () => scriptTag.remove();
-    document.body.appendChild(scriptTag);
+    });
   } catch (err) {
     console.warn("Could not fetch remote lead queue:", err);
   }
@@ -2287,7 +2256,7 @@ function checkCallerSecurityAccess() {
   fetchCentralLeadQueue();
 }
 
-// --- LOGIN HANDLER ---
+// --- LOGIN HANDLER (Firebase) ---
 async function handleCallerLogin(event) {
   event.preventDefault();
 
@@ -2305,23 +2274,6 @@ async function handleCallerLogin(event) {
   if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i data-lucide="loader-2" class="spin-icon"></i> Verifying...'; if (window.lucide) window.lucide.createIcons(); }
   if (errBox)    errBox.classList.add('hidden');
 
-  const deviceId       = getStableDeviceId();
-  const callbackName   = 'authCb_' + Date.now();
-
-  // Build the JSONP URL
-  const authUrl = sheetUrl + '?action=verify_user'
-    + '&name='     + encodeURIComponent(nameVal)
-    + '&pin='      + encodeURIComponent(pinVal)
-    + '&deviceId=' + encodeURIComponent(deviceId)
-    + '&callback=' + callbackName
-    + '&_t='       + Date.now();
-
-  // Timeout: 15 s
-  const timer = setTimeout(function() {
-    cleanup();
-    showErr('⛔ No response from server. Check your internet and try again.');
-  }, 15000);
-
   function resetBtn() {
     if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i data-lucide="key-round"></i> Unlock Access'; if (window.lucide) window.lucide.createIcons(); }
   }
@@ -2329,53 +2281,75 @@ async function handleCallerLogin(event) {
     resetBtn();
     if (errBox) { errBox.innerText = msg; errBox.classList.remove('hidden'); }
   }
-  function cleanup() {
-    clearTimeout(timer);
-    try { delete window[callbackName]; } catch(e){}
-    const s = document.getElementById('auth-jsonp-script');
-    if (s) s.remove();
+
+  if (!db) {
+    showErr('⛔ Database not connected. Please contact Admin.');
+    return;
   }
 
-  // Define the callback BEFORE injecting the script
-  window[callbackName] = function(data) {
-    cleanup();
-    resetBtn();
+  const deviceId = getStableDeviceId();
 
-    if (data && data.status === 'success' && data.authorized === true) {
-      // ✅ SUCCESS — write token then show app
-      const n = data.name || nameVal;
-      const r = data.role || 'Caller';
-      try { localStorage.setItem('telecaller_auth_token', 'TRUE'); } catch(e){}
-      try { localStorage.setItem('telecaller_agent_name', n); } catch(e){}
-      try { localStorage.setItem('telecaller_user_role',  r); } catch(e){}
-      try { sessionStorage.setItem('telecaller_auth_token', 'TRUE'); } catch(e){}
-      try { sessionStorage.setItem('telecaller_agent_name', n); } catch(e){}
-      try { sessionStorage.setItem('telecaller_user_role',  r); } catch(e){}
-      
-      showToast('Access Granted', 'Welcome ' + n + '! System unlocked.', 'success');
-      checkCallerSecurityAccess();
-      fetchRemoteLogs();
-    } else {
-      // ❌ FAILED — clear any stale token and show error
-      try { localStorage.removeItem('telecaller_auth_token'); } catch(e){}
-      try { localStorage.removeItem('telecaller_agent_name'); } catch(e){}
-      try { localStorage.removeItem('telecaller_user_role'); } catch(e){}
-      try { sessionStorage.removeItem('telecaller_auth_token'); } catch(e){}
-      try { sessionStorage.removeItem('telecaller_agent_name'); } catch(e){}
-      try { sessionStorage.removeItem('telecaller_user_role'); } catch(e){}
-      
-      const msg = (data && data.message) ? data.message : 'Invalid Name or Security PIN.';
-      showErr('⛔ ' + msg);
-      checkCallerSecurityAccess();
+  try {
+    const userRef = db.collection('users').doc(nameVal.toLowerCase());
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      showErr('⛔ Invalid Name or Security PIN.');
+      return;
     }
-  };
 
-  // Inject JSONP script tag
-  const script  = document.createElement('script');
-  script.id     = 'auth-jsonp-script';
-  script.src    = authUrl;
-  script.onerror= function() { cleanup(); showErr('⛔ Could not reach the server. Check your internet connection.'); };
-  document.body.appendChild(script);
+    const userData = userDoc.data();
+
+    if (String(userData.pin).trim() !== pinVal) {
+      showErr('⛔ Invalid Name or Security PIN.');
+      db.collection('audit_logs').add({ timestamp: new Date().toISOString(), callerName: nameVal, eventType: 'FAILED_LOGIN', details: 'Failed PIN attempt from device: ' + deviceId });
+      return;
+    }
+
+    if (userData.status && userData.status.toLowerCase() !== 'active') {
+      showErr('⛔ Account Revoked. Please contact Admin.');
+      db.collection('audit_logs').add({ timestamp: new Date().toISOString(), callerName: nameVal, eventType: 'BLOCKED_LOGIN', details: 'Attempted login on revoked account from device: ' + deviceId });
+      return;
+    }
+
+    // Device Binding Check
+    let finalBoundDevice = userData.boundDevice || '';
+    if (finalBoundDevice && finalBoundDevice !== deviceId && userData.role !== 'Admin') {
+      showErr('⛔ Unauthorized Device! Your PIN is bound to another phone. Contact Admin.');
+      db.collection('audit_logs').add({ timestamp: new Date().toISOString(), callerName: nameVal, eventType: 'UNAUTHORIZED_DEVICE', details: 'Login rejected! PIN used on unauthorized device: ' + deviceId + ' (Bound: ' + finalBoundDevice + ')' });
+      return;
+    }
+
+    // If no device bound yet, bind it now
+    if (!finalBoundDevice && userData.role !== 'Admin') {
+      finalBoundDevice = deviceId;
+      await userRef.update({ boundDevice: deviceId });
+    }
+
+    // Log successful login
+    await userRef.update({ lastLogin: new Date().toISOString() });
+    db.collection('audit_logs').add({ timestamp: new Date().toISOString(), callerName: userData.name || nameVal, eventType: 'LOGIN', details: 'Logged into app successfully from device: ' + deviceId });
+
+    // ✅ SUCCESS — write token then show app
+    const n = userData.name || nameVal;
+    const r = userData.role || 'Caller';
+    
+    try { localStorage.setItem('telecaller_auth_token', 'TRUE'); } catch(e){}
+    try { localStorage.setItem('telecaller_agent_name', n); } catch(e){}
+    try { localStorage.setItem('telecaller_user_role',  r); } catch(e){}
+    try { sessionStorage.setItem('telecaller_auth_token', 'TRUE'); } catch(e){}
+    try { sessionStorage.setItem('telecaller_agent_name', n); } catch(e){}
+    try { sessionStorage.setItem('telecaller_user_role',  r); } catch(e){}
+    
+    resetBtn();
+    showToast('Access Granted', 'Welcome ' + n + '! System unlocked.', 'success');
+    checkCallerSecurityAccess();
+    fetchRemoteLogs();
+
+  } catch (err) {
+    console.error("Login Error:", err);
+    showErr('⛔ Could not connect to the server. Check your internet.');
+  }
 }
 
 
