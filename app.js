@@ -2223,10 +2223,60 @@ window.addEventListener("resize", () => {
 });
 
 // --- 🔒 SECURITY ACCESS & PIN AUTHENTICATION ENGINE ---
+
+// Generate a stable browser fingerprint that survives localStorage clears
+// Based on immutable device properties: screen, timezone, user agent
+function getStableDeviceId() {
+  try {
+    const ua = navigator.userAgent || '';
+    const screen = (window.screen.width || 0) + 'x' + (window.screen.height || 0);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const lang = navigator.language || '';
+    const raw = ua + '|' + screen + '|' + tz + '|' + lang;
+    // Simple hash
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) {
+      const char = raw.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    const stableId = 'fp_' + Math.abs(hash).toString(36);
+    // Cache in both storages
+    try { localStorage.setItem('telecaller_device_id', stableId); } catch(e) {}
+    try { sessionStorage.setItem('telecaller_device_id', stableId); } catch(e) {}
+    return stableId;
+  } catch(e) {
+    // Ultimate fallback: try cached, then generate random once
+    let id = '';
+    try { id = localStorage.getItem('telecaller_device_id') || sessionStorage.getItem('telecaller_device_id') || ''; } catch(e2) {}
+    if (!id) {
+      id = 'dev_' + Math.random().toString(36).substring(2, 10);
+      try { localStorage.setItem('telecaller_device_id', id); } catch(e3) {}
+      try { sessionStorage.setItem('telecaller_device_id', id); } catch(e3) {}
+    }
+    return id;
+  }
+}
+
 function checkCallerSecurityAccess() {
-  const isAuth = localStorage.getItem('telecaller_auth_token') === 'TRUE';
-  const callerName = localStorage.getItem('telecaller_agent_name');
-  const userRole = localStorage.getItem('telecaller_user_role') || 'Caller';
+  // Read auth token from localStorage first, fall back to sessionStorage
+  let isAuth = false;
+  let callerName = '';
+  let userRole = 'Caller';
+  try {
+    isAuth = localStorage.getItem('telecaller_auth_token') === 'TRUE'
+           || sessionStorage.getItem('telecaller_auth_token') === 'TRUE';
+    callerName = localStorage.getItem('telecaller_agent_name')
+              || sessionStorage.getItem('telecaller_agent_name') || '';
+    userRole = localStorage.getItem('telecaller_user_role')
+             || sessionStorage.getItem('telecaller_user_role') || 'Caller';
+    // Sync back to localStorage in case it was cleared
+    if (isAuth && callerName) {
+      localStorage.setItem('telecaller_auth_token', 'TRUE');
+      localStorage.setItem('telecaller_agent_name', callerName);
+      localStorage.setItem('telecaller_user_role', userRole);
+    }
+  } catch(e) { /* private mode: rely on sessionStorage only */ }
 
   const modal = document.getElementById('security-auth-modal');
   const badgeName = document.getElementById('logged-user-name');
@@ -2279,12 +2329,8 @@ async function handleCallerLogin(event) {
   }
   if (errBox) errBox.classList.add("hidden");
 
-  // Retrieve or generate persistent unique Device Hardware Fingerprint ID
-  let deviceId = localStorage.getItem("telecaller_device_id");
-  if (!deviceId) {
-    deviceId = "dev_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now();
-    localStorage.setItem("telecaller_device_id", deviceId);
-  }
+  // Generate stable device fingerprint (same every visit, even after localStorage clear)
+  const deviceId = getStableDeviceId();
 
   // --- STRICT PRIOR AUTHENTICATION VERIFICATION ENGINE ---
   try {
@@ -2314,9 +2360,15 @@ async function handleCallerLogin(event) {
 
       if (data && data.status === "success" && data.authorized) {
         // STRICT VERIFICATION PASSED! Unlock app only now.
-        localStorage.setItem("telecaller_auth_token", "TRUE");
-        localStorage.setItem("telecaller_agent_name", data.name || nameVal);
-        localStorage.setItem("telecaller_user_role", data.role || "Caller");
+        // Write to BOTH storages so auth survives if localStorage is wiped
+        const aName = data.name || nameVal;
+        const aRole = data.role || "Caller";
+        try { localStorage.setItem("telecaller_auth_token", "TRUE"); } catch(e) {}
+        try { localStorage.setItem("telecaller_agent_name", aName); } catch(e) {}
+        try { localStorage.setItem("telecaller_user_role", aRole); } catch(e) {}
+        try { sessionStorage.setItem("telecaller_auth_token", "TRUE"); } catch(e) {}
+        try { sessionStorage.setItem("telecaller_agent_name", aName); } catch(e) {}
+        try { sessionStorage.setItem("telecaller_user_role", aRole); } catch(e) {}
 
         showToast("Access Granted", `Welcome ${data.name}! System unlocked.`, "success");
         checkCallerSecurityAccess();
@@ -2324,9 +2376,12 @@ async function handleCallerLogin(event) {
         fetchCentralLeadQueue();
       } else {
         // STRICT VERIFICATION FAILED! Keep app 100% locked.
-        localStorage.removeItem("telecaller_auth_token");
-        localStorage.removeItem("telecaller_agent_name");
-        localStorage.removeItem("telecaller_user_role");
+        try { localStorage.removeItem("telecaller_auth_token"); } catch(e) {}
+        try { localStorage.removeItem("telecaller_agent_name"); } catch(e) {}
+        try { localStorage.removeItem("telecaller_user_role"); } catch(e) {}
+        try { sessionStorage.removeItem("telecaller_auth_token"); } catch(e) {}
+        try { sessionStorage.removeItem("telecaller_agent_name"); } catch(e) {}
+        try { sessionStorage.removeItem("telecaller_user_role"); } catch(e) {}
         checkCallerSecurityAccess();
 
         const msg = (data && data.message) ? data.message : "Invalid Name or Security PIN.";
@@ -2391,10 +2446,13 @@ async function handleCallerLogin(event) {
 
 function logoutCaller() {
   if (confirm("Are you sure you want to lock and log out of the Telecaller portal?")) {
-    const callerName = localStorage.getItem("telecaller_agent_name") || "Caller";
-    localStorage.removeItem("telecaller_auth_token");
-    localStorage.removeItem("telecaller_agent_name");
-    localStorage.removeItem("telecaller_user_role");
+    const callerName = localStorage.getItem("telecaller_agent_name") || sessionStorage.getItem("telecaller_agent_name") || "Caller";
+    try { localStorage.removeItem("telecaller_auth_token"); } catch(e) {}
+    try { localStorage.removeItem("telecaller_agent_name"); } catch(e) {}
+    try { localStorage.removeItem("telecaller_user_role"); } catch(e) {}
+    try { sessionStorage.removeItem("telecaller_auth_token"); } catch(e) {}
+    try { sessionStorage.removeItem("telecaller_agent_name"); } catch(e) {}
+    try { sessionStorage.removeItem("telecaller_user_role"); } catch(e) {}
     
     // Log Security Audit Logout
     try {
