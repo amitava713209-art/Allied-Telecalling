@@ -102,7 +102,7 @@ function doPost(e) {
             userSheet.getRange(foundUserRow, 5).setValue(reqDeviceId);
           }
           if (foundUserRow !== -1) {
-            userSheet.getRange(foundUserRow, 6).setValue(new Date());
+            userSheet.getRange(foundUserRow, 6).setValue(Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "dd/MM/yyyy HH:mm:ss"));
           }
           
           resObj = { status: "success", authorized: true, name: foundUser.name, role: foundUser.role };
@@ -412,7 +412,7 @@ function doGet(e) {
             userSheet.getRange(foundUserRow, 5).setValue(reqDeviceId);
           }
           if (foundUserRow !== -1) {
-            userSheet.getRange(foundUserRow, 6).setValue(new Date());
+            userSheet.getRange(foundUserRow, 6).setValue(Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "dd/MM/yyyy HH:mm:ss"));
           }
           resObj = { status: "success", authorized: true, name: foundUser.name, role: foundUser.role };
           logAudit(ss, foundUser.name, "LOGIN", "Logged into app successfully.");
