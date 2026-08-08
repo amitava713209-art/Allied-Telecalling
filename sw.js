@@ -1,16 +1,17 @@
 /* Allied Telecalling PWA Service Worker
    Version: 2.0 — Mobile-First Build */
 
-const CACHE_NAME = 'allied-call-v8';
+const CACHE_NAME = 'allied-call-v9';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/style.css',
   '/app.js',
   '/logo.png',
+  '/icon-192.png',
+  '/icon-512.png',
   '/manifest.json',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-  'https://unpkg.com/lucide@latest'
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
 ];
 
 // Install: cache all static assets
