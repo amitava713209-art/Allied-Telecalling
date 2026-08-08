@@ -70,7 +70,8 @@ function doPost(e) {
       
       for (var u = 1; u < uData.length; u++) {
         var uName = String(uData[u][0] || "").trim().toLowerCase();
-        var uPin = String(uData[u][1] || "").trim();
+        var uPin = String(uData[u][1] !== undefined && uData[u][1] !== null ? uData[u][1] : "").trim();
+        if (uPin.indexOf('.') !== -1) uPin = uPin.split('.')[0];
         var uStatus = String(uData[u][2] || "").trim();
         var uRole = String(uData[u][3] || "").trim();
         var uBoundDevice = String(uData[u][4] || "").trim();
@@ -387,7 +388,8 @@ function doGet(e) {
       
       for (var u = 1; u < uData.length; u++) {
         var uName = String(uData[u][0] || "").trim().toLowerCase();
-        var uPin = String(uData[u][1] || "").trim();
+        var uPin = String(uData[u][1] !== undefined && uData[u][1] !== null ? uData[u][1] : "").trim();
+        if (uPin.indexOf('.') !== -1) uPin = uPin.split('.')[0];
         var uStatus = String(uData[u][2] || "").trim();
         var uRole = String(uData[u][3] || "").trim();
         var uBoundDevice = String(uData[u][4] || "").trim();
