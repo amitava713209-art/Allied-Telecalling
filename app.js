@@ -2235,21 +2235,29 @@ function getStableDeviceId() {
     let h = 0;
     for (let i = 0; i < raw.length; i++) { h = Math.imul(31, h) + raw.charCodeAt(i) | 0; }
     const id = 'fp_' + Math.abs(h).toString(36);
-    localStorage.setItem('telecaller_device_id', id);
+    try { localStorage.setItem('telecaller_device_id', id); } catch(e){}
+    try { sessionStorage.setItem('telecaller_device_id', id); } catch(e){}
     return id;
   } catch(e) {
-    let id = localStorage.getItem('telecaller_device_id') || '';
-    if (!id) { id = 'dev_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('telecaller_device_id', id); }
+    let id = '';
+    try { id = localStorage.getItem('telecaller_device_id') || sessionStorage.getItem('telecaller_device_id') || ''; } catch(e2){}
+    if (!id) { 
+      id = 'dev_' + Math.random().toString(36).slice(2, 10); 
+      try { localStorage.setItem('telecaller_device_id', id); } catch(e3){}
+      try { sessionStorage.setItem('telecaller_device_id', id); } catch(e3){}
+    }
     return id;
   }
 }
 
 // --- AUTH CHECK: show or hide the login modal ---
 function checkCallerSecurityAccess() {
-  const token     = localStorage.getItem('telecaller_auth_token');
-  const name      = localStorage.getItem('telecaller_agent_name');
-  const role      = localStorage.getItem('telecaller_user_role') || 'Caller';
-  const isAuth    = (token === 'TRUE') && name && name.length > 0;
+  let token = '', name = '', role = 'Caller';
+  try { token = localStorage.getItem('telecaller_auth_token') || sessionStorage.getItem('telecaller_auth_token'); } catch(e){}
+  try { name = localStorage.getItem('telecaller_agent_name') || sessionStorage.getItem('telecaller_agent_name'); } catch(e){}
+  try { role = localStorage.getItem('telecaller_user_role') || sessionStorage.getItem('telecaller_user_role') || 'Caller'; } catch(e){}
+
+  const isAuth = (token === 'TRUE') && name && name.length > 0;
 
   const modal      = document.getElementById('security-auth-modal');
   const badgeName  = document.getElementById('logged-user-name');
@@ -2294,7 +2302,7 @@ async function handleCallerLogin(event) {
   if (!nameVal || !pinVal) return;
 
   // Show loading state
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Verifying...'; }
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i data-lucide="loader-2" class="spin-icon"></i> Verifying...'; if (window.lucide) window.lucide.createIcons(); }
   if (errBox)    errBox.classList.add('hidden');
 
   const deviceId       = getStableDeviceId();
@@ -2323,7 +2331,7 @@ async function handleCallerLogin(event) {
   }
   function cleanup() {
     clearTimeout(timer);
-    delete window[callbackName];
+    try { delete window[callbackName]; } catch(e){}
     const s = document.getElementById('auth-jsonp-script');
     if (s) s.remove();
   }
@@ -2337,17 +2345,25 @@ async function handleCallerLogin(event) {
       // ✅ SUCCESS — write token then show app
       const n = data.name || nameVal;
       const r = data.role || 'Caller';
-      localStorage.setItem('telecaller_auth_token', 'TRUE');
-      localStorage.setItem('telecaller_agent_name', n);
-      localStorage.setItem('telecaller_user_role',  r);
+      try { localStorage.setItem('telecaller_auth_token', 'TRUE'); } catch(e){}
+      try { localStorage.setItem('telecaller_agent_name', n); } catch(e){}
+      try { localStorage.setItem('telecaller_user_role',  r); } catch(e){}
+      try { sessionStorage.setItem('telecaller_auth_token', 'TRUE'); } catch(e){}
+      try { sessionStorage.setItem('telecaller_agent_name', n); } catch(e){}
+      try { sessionStorage.setItem('telecaller_user_role',  r); } catch(e){}
+      
       showToast('Access Granted', 'Welcome ' + n + '! System unlocked.', 'success');
       checkCallerSecurityAccess();
       fetchRemoteLogs();
     } else {
       // ❌ FAILED — clear any stale token and show error
-      localStorage.removeItem('telecaller_auth_token');
-      localStorage.removeItem('telecaller_agent_name');
-      localStorage.removeItem('telecaller_user_role');
+      try { localStorage.removeItem('telecaller_auth_token'); } catch(e){}
+      try { localStorage.removeItem('telecaller_agent_name'); } catch(e){}
+      try { localStorage.removeItem('telecaller_user_role'); } catch(e){}
+      try { sessionStorage.removeItem('telecaller_auth_token'); } catch(e){}
+      try { sessionStorage.removeItem('telecaller_agent_name'); } catch(e){}
+      try { sessionStorage.removeItem('telecaller_user_role'); } catch(e){}
+      
       const msg = (data && data.message) ? data.message : 'Invalid Name or Security PIN.';
       showErr('⛔ ' + msg);
       checkCallerSecurityAccess();
