@@ -1703,6 +1703,9 @@ async function handleExcelUpload(event) {
     }
   };
 
+  reader.readAsArrayBuffer(file);
+}
+
 async function syncCentralLeadQueue(newLeads, replace = false) {
   if (!db) return;
   if (!replace && (!newLeads || newLeads.length === 0)) return;
