@@ -136,8 +136,7 @@ function loadStoredData() {
       }, 1200);
     }
 
-    // Prioritize DEFAULT_SHEET_URL so callers never have to configure anything manually
-    sheetUrl = DEFAULT_SHEET_URL || localStorage.getItem("telecaller_sheet_url") || "";
+    // sheetUrl is null now (Firebase is used instead of Google Sheets)
   } catch (error) {
     console.error("Error loading local storage data:", error);
     showToast("Error", "Could not load previously saved logs.", "error");
@@ -373,7 +372,7 @@ function openSettings() {
   const modal = document.getElementById("settings-modal");
   const urlInput = document.getElementById("web-app-url");
   
-  urlInput.value = DEFAULT_SHEET_URL || localStorage.getItem("telecaller_sheet_url") || "";
+  urlInput.value = localStorage.getItem("telecaller_sheet_url") || "";
   modal.style.display = "flex";
   
   const testStatus = document.getElementById("test-conn-status");
@@ -1658,6 +1657,8 @@ async function handleExcelUpload(event) {
               break;
             }
           }
+        }
+
         if (mobile.length === 10) {
           newQueue.push({
             id: `lead_${Date.now()}_${index}`,
@@ -2398,7 +2399,7 @@ function openSettings() {
     modal.classList.remove("hidden-modal");
   }
   if (input) {
-    input.value = sheetUrl || DEFAULT_SHEET_URL;
+    input.value = sheetUrl || "";
   }
 }
 
