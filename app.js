@@ -2293,12 +2293,20 @@ async function handleCallerLogin(event) {
     const userRef = db.collection('users').doc(nameVal.toLowerCase());
     const userDoc = await userRef.get();
 
-    if (!userDoc.exists) {
-      showErr('⛔ Invalid Name or Security PIN.');
-      return;
-    }
+    let userData;
 
-    const userData = userDoc.data();
+    if (!userDoc.exists) {
+      // Self-Healing: Auto-create Admin if it doesn't exist
+      if (nameVal.toLowerCase() === 'admin' && pinVal === '1234') {
+        userData = { name: 'Admin', pin: '1234', role: 'Admin', status: 'Active', boundDevice: '' };
+        await userRef.set(userData);
+      } else {
+        showErr('Error: Invalid Name or Security PIN.');
+        return;
+      }
+    } else {
+      userData = userDoc.data();
+    }
 
     if (String(userData.pin).trim() !== pinVal) {
       showErr('⛔ Invalid Name or Security PIN.');
@@ -2307,7 +2315,7 @@ async function handleCallerLogin(event) {
     }
 
     if (userData.status && userData.status.toLowerCase() !== 'active') {
-      showErr('⛔ Account Revoked. Please contact Admin.');
+      showErr('Error: Account Revoked. Please contact Admin.');
       db.collection('audit_logs').add({ timestamp: new Date().toISOString(), callerName: nameVal, eventType: 'BLOCKED_LOGIN', details: 'Attempted login on revoked account from device: ' + deviceId });
       return;
     }
@@ -2315,7 +2323,7 @@ async function handleCallerLogin(event) {
     // Device Binding Check
     let finalBoundDevice = userData.boundDevice || '';
     if (finalBoundDevice && finalBoundDevice !== deviceId && userData.role !== 'Admin') {
-      showErr('⛔ Unauthorized Device! Your PIN is bound to another phone. Contact Admin.');
+      showErr('Error: Unauthorized Device! Your PIN is bound to another phone. Contact Admin.');
       db.collection('audit_logs').add({ timestamp: new Date().toISOString(), callerName: nameVal, eventType: 'UNAUTHORIZED_DEVICE', details: 'Login rejected! PIN used on unauthorized device: ' + deviceId + ' (Bound: ' + finalBoundDevice + ')' });
       return;
     }
@@ -2348,7 +2356,7 @@ async function handleCallerLogin(event) {
 
   } catch (err) {
     console.error("Login Error:", err);
-    showErr('⛔ Could not connect to the server. Check your internet.');
+    showErr('Error: Could not connect to the server. Check your internet or Firebase config.');
   }
 }
 
