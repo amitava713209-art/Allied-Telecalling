@@ -126,15 +126,7 @@ function loadStoredData() {
       leadQueue = [];
     }
 
-    // One-time Queue Reset: Flush corrupted pending leads so team starts 100% fresh with Directory
-    if (localStorage.getItem("telecaller_queue_v4_flushed") !== "TRUE") {
-      leadQueue = [];
-      localStorage.setItem("telecaller_lead_queue", JSON.stringify([]));
-      localStorage.setItem("telecaller_queue_v4_flushed", "TRUE");
-      setTimeout(() => {
-        syncCentralLeadQueue([], true);
-      }, 1200);
-    }
+    // NOTE: Old one-time flush removed - it was deleting all Firestore leads on new devices
 
     // sheetUrl is null now (Firebase is used instead of Google Sheets)
   } catch (error) {
