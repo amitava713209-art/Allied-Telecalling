@@ -1541,7 +1541,7 @@ async function handleExcelUpload(event) {
       const dedupedNew = newQueue.filter(l => !existingMobiles.has(String(l.mobile)));
 
       leadQueue = [...dedupedNew, ...leadQueue];
-      activeBatchDirectory = directoryName; // switch directory
+      activeBatchDirectory = "ALL"; // show ALL directories so old data stays visible
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
       syncCentralLeadQueue(dedupedNew, false);
@@ -1685,7 +1685,7 @@ async function handleExcelUpload(event) {
       const skipped = parsedCount - dedupedNew.length;
 
       leadQueue = [...dedupedNew, ...leadQueue];
-      activeBatchDirectory = directoryName; // switch to newly uploaded directory
+      activeBatchDirectory = "ALL"; // show ALL directories so old data stays visible
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
 

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Import Doctor Leads - Allied Calling</title>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 30px; background: #0f172a; color: #e2e8f0; }
+    h1 { color: #38bdf8; }
+    button { background: #3b82f6; color: white; border: none; padding: 14px 28px; font-size: 16px; border-radius: 8px; cursor: pointer; margin-top: 16px; }
+    button:hover { background: #2563eb; }
+    #status { margin-top: 20px; padding: 16px; border-radius: 8px; background: #1e293b; font-size: 14px; line-height: 1.8; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+    .ok { color: #4ade80; }
+    .err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>🩺 Import 46 Doctor Leads → Firebase</h1>
+  <p>This page will add all 46 doctors from the image directly into your Firebase <code>leads</code> collection under the directory <b>"Doctor Batch - Aug"</b>.</p>
+  <button onclick="importLeads()">▶ Start Import</button>
+  <div id="status">Waiting to start...</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyClDshgmFBrT4nc-CyyGkPTVHWL2MDnals",
+  authDomain: "allied-calling.firebaseapp.com",
+  projectId: "allied-calling",
+  storageBucket: "allied-calling.firebasestorage.app",
+  messagingSenderId: "739358896582",
+  appId: "1:739358896582:web:6912d108eb35990a1282c7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const DIRECTORY = "Doctor Batch - Aug";
+const leads = [
+  { name: "Dr. Diptanshu Mukherjee",            mobile: "9830125404" },
+  { name: "Dr. Sandip Sankar Ghosh",             mobile: "9836450715" },
+  { name: "Dr. Joydeep Banerjee Chowdhury",      mobile: "9830065519" },
+  { name: "Dr. T K Samanta",                     mobile: "8442939402" },
+  { name: "Dr. Shankar Sen (Sen Homeo Clinic)",   mobile: "9339198776" },
+  { name: "Dr. Siddhartha Sankar Roy",            mobile: "9830006644" },
+  { name: "Dr. Ajoy Sarkar",                     mobile: "9433202968" },
+  { name: "Dr. Sreerup Sarkar",                  mobile: "9831298034" },
+  { name: "Dr. S Goswami",                       mobile: "7278116663" },
+  { name: "Dr. Ashok Ghosh",                     mobile: "9002146524" },
+  { name: "Dr. Sanjoy Banerjee",                 mobile: "9831030272" },
+  { name: "Dr. Manoj Kumar Daga",                mobile: "9836927779" },
+  { name: "Dr. Anindya Dutta (Amrita Medical Hall)", mobile: "9883271515" },
+  { name: "Dr. Anindya Roy",                     mobile: "9434070688" },
+  { name: "Dr. Aparajita Saha (Nutri Diet Dietician)", mobile: "9582532625" },
+  { name: "Dr. Chhanda Bhattacharya",            mobile: "9874356272" },
+  { name: "Dr. S K Maji (Rittik Nursing Home)",  mobile: "9830128511" },
+  { name: "Dr. Sandipan Paul (Pediatrician)",    mobile: "9836989284" },
+  { name: "Dr. Biswajit Bhaduri",                mobile: "9830055312" },
+  { name: "Dr. Samrat Sandip Bose (JMD Medicare)", mobile: "9433680403" },
+  { name: "Dr. Subhabrata Das",                  mobile: "9231861359" },
+  { name: "Dr. G M Rahman",                      mobile: "9830450037" },
+  { name: "Dr. Amrish Kumar Jha",                mobile: "9903324254" },
+  { name: "Dr. Amarnathpal Memorial Polyclinic", mobile: "9433377612" },
+  { name: "Dr. Das Chamber",                     mobile: "7278564538" },
+  { name: "Dr. Aditya Narayan Saha",             mobile: "9830166619" },
+  { name: "Dr. Anindya Kishore Majumder",        mobile: "9748125333" },
+  { name: "Dr. Lokesh Pandey",                   mobile: "9831097883" },
+  { name: "Dr. Bikash Kr Dey",                   mobile: "9831084293" },
+  { name: "Dr. Amitava De",                      mobile: "9477018965" },
+  { name: "Dr. Ashim Kumar Kundu",               mobile: "9433072391" },
+  { name: "Dr. Amit Dey (Apollo Clinic)",        mobile: "9432011111" },
+  { name: "Dr. Dinesh Jaiswal",                  mobile: "9831061175" },
+  { name: "Dr. Apurba Mukherjee",                mobile: "9433014467" },
+  { name: "Dr. Rudra Acharya",                   mobile: "9433131820" },
+  { name: "Dr. Mohan Paul",                      mobile: "9836007557" },
+  { name: "Dr. Sk Das (Ideal Clinic)",           mobile: "8389914550" },
+  { name: "Dr. Debashis Bakshi",                 mobile: "9831111317" },
+  { name: "Dr. Debasish Choudhury",              mobile: "9830156959" },
+  { name: "Dr. Shymal Kundu",                    mobile: "9836232491" },
+  { name: "Dr. Indraneel Basu's Dental Clinic",  mobile: "9093566173" },
+  { name: "Dr. Koushik Chakraborty (Welcare Medical)", mobile: "9674268398" },
+  { name: "Dr. S P Upadhyay (Sahid Khudiram Bose H)", mobile: "9831196190" },
+  { name: "Dr. Kaushik Sarkar (RSV Hospital)",   mobile: "8334844487" },
+  { name: "Dr. Chandrima Das Gupta",             mobile: "9830712463" },
+  { name: "Dr. Dipesh Kumar Mandal",             mobile: "9433087446" }
+];
+
+async function importLeads() {
+  const status = document.getElementById('status');
+  status.innerHTML = '⏳ Starting import...\n';
+
+  let success = 0, skipped = 0, failed = 0;
+
+  // Check existing mobiles to avoid duplicates
+  const existingSnap = await db.collection('leads').get();
+  const existingMobiles = new Set();
+  existingSnap.forEach(doc => {
+    const d = doc.data();
+    if (d.mobile) existingMobiles.add(String(d.mobile));
+  });
+
+  status.innerHTML += `Found ${existingMobiles.size} existing leads in Firebase.\n\n`;
+
+  for (const lead of leads) {
+    if (existingMobiles.has(lead.mobile)) {
+      status.innerHTML += `<span class="err">⏭ SKIPPED (duplicate): ${lead.name} - ${lead.mobile}</span>\n`;
+      skipped++;
+      continue;
+    }
+
+    try {
+      await db.collection('leads').add({
+        name: lead.name,
+        mobile: lead.mobile,
+        category: "Doctor",
+        sourceFile: DIRECTORY,
+        status: "Pending",
+        age: "",
+        gender: "",
+        city: ""
+      });
+      status.innerHTML += `<span class="ok">✅ Added: ${lead.name} - ${lead.mobile}</span>\n`;
+      success++;
+    } catch (e) {
+      status.innerHTML += `<span class="err">❌ FAILED: ${lead.name} - ${e.message}</span>\n`;
+      failed++;
+    }
+
+    // Small delay to avoid rate limiting
+    await new Promise(r => setTimeout(r, 100));
+    status.scrollTop = status.scrollHeight;
+  }
+
+  status.innerHTML += `\n<b>✅ Done! Added: ${success} | Skipped: ${skipped} | Failed: ${failed}</b>`;
+  if (success > 0) {
+    status.innerHTML += '\n\n🎉 Refresh your Allied Calling app - all leads will appear!';
+  }
+}
+</script>
+</body>
+</html>
