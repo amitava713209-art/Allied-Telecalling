@@ -189,12 +189,27 @@
     }
   }
 
-  // --- Upload rows to Firestore ---
+  // --- Upload rows to Firestore (with deduplication) ---
   async function uploadRows(rows, collectionName, mapper) {
-    let uploaded = 0, skipped = 0;
+    let uploaded = 0, skipped = 0, dupes = 0;
     let batch = db.batch();
     let batchCount = 0;
     const skippedSamples = [];
+
+    // For leads: fetch all existing mobile numbers from Firestore to skip duplicates
+    const existingMobiles = new Set();
+    if (collectionName === 'leads') {
+      log('🔍 Checking existing leads in Firebase to skip duplicates...', 'info');
+      const snap = await db.collection('leads').get();
+      snap.forEach(doc => {
+        const m = String(doc.data().mobile || '').trim();
+        if (m) existingMobiles.add(m);
+      });
+      log(`   Found ${existingMobiles.size} existing leads already in Firebase.`, 'info');
+    }
+
+    // Deduplicate within the file itself by mobile number
+    const seenInFile = new Set();
 
     for (let i = 0; i < rows.length; i++) {
       const docData = mapper(rows[i]);
@@ -205,6 +220,13 @@
         }
         continue;
       }
+
+      // Skip if mobile already exists in Firestore
+      if (existingMobiles.has(docData.mobile)) { dupes++; continue; }
+
+      // Skip if mobile already seen in this file
+      if (seenInFile.has(docData.mobile)) { dupes++; continue; }
+      seenInFile.add(docData.mobile);
 
       let docRef;
       if (collectionName === 'users' && docData.name) {
@@ -228,11 +250,14 @@
     if (batchCount > 0) await batch.commit();
 
     if (skipped > 0 && skippedSamples.length > 0) {
-      log(`⚠️ ${skipped} rows skipped (no valid 10-digit number found). Sample skipped rows:`, 'error');
+      log(`⚠️ ${skipped} rows skipped (no valid 10-digit number found). Sample:`, 'error');
       skippedSamples.forEach(s => log(`   ${s}`, 'error'));
     }
+    if (dupes > 0) {
+      log(`⏭️ ${dupes} duplicate mobile numbers skipped.`, 'info');
+    }
 
-    return { uploaded, skipped };
+    return { uploaded, skipped, dupes };
   }
 
   // --- Main handler ---
@@ -248,10 +273,10 @@
       }
       log(`Found ${rows.length} rows. Uploading to "${collectionName}"...`, 'info');
       try {
-        const { uploaded, skipped } = await uploadRows(rows, collectionName, mapper);
-        log(`✅ Done! Uploaded: ${uploaded} | Skipped (no mobile): ${skipped}`, 'success');
+        const { uploaded, skipped, dupes } = await uploadRows(rows, collectionName, mapper);
+        log(`✅ Done! Uploaded: ${uploaded} | Duplicates skipped: ${dupes} | No-number rows: ${skipped}`, 'success');
         if (uploaded > 0) log(`🎉 Refresh your Allied Calling app to see the data!`, 'success');
-        else log(`⚠️ 0 uploaded - check column names above match Name/Mobile fields`, 'error');
+        else log(`⚠️ 0 uploaded - check column names above`, 'error');
       } catch(e) {
         log('❌ Upload error: ' + e.message, 'error');
       }
