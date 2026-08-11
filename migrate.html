@@ -157,9 +157,20 @@
       reader.onload = function(e) {
         try {
           const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-          callback(rows);
+          log(`📊 Sheets found: ${wb.SheetNames.join(', ')}`, 'info');
+
+          // Read ALL sheets and combine rows
+          let allRows = [];
+          for (const sheetName of wb.SheetNames) {
+            const ws = wb.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            if (rows.length > 0) {
+              log(`  → Sheet "${sheetName}": ${rows.length} rows`, 'info');
+              allRows = allRows.concat(rows);
+            }
+          }
+          log(`📦 Total combined rows across all sheets: ${allRows.length}`, 'info');
+          callback(allRows);
         } catch(err) {
           log('❌ Error reading Excel: ' + err.message, 'error');
         }
