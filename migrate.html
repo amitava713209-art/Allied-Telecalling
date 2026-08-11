@@ -93,22 +93,25 @@
   function mapLead(row) {
     const keys = Object.keys(row);
 
-    // Find mobile: scan ALL columns for a valid 10-digit Indian number
+    // Find mobile: scan ALL columns for any 10-digit number
     let mobile = '';
     for (const k of keys) {
-      const val = String(row[k] || '').trim().replace(/\D/g, '');
+      const val = String(row[k] || '').trim().replace(/[\s\-\(\)\.]/g, '').replace(/\D/g, '');
       let cleaned = val;
+      // Strip country code +91 or 0 prefix
       if (cleaned.length === 12 && cleaned.startsWith('91')) cleaned = cleaned.slice(2);
+      if (cleaned.length === 11 && cleaned.startsWith('0')) cleaned = cleaned.slice(1);
       if (cleaned.length > 10) cleaned = cleaned.slice(-10);
-      if (cleaned.length === 10 && /^[6-9]/.test(cleaned)) {
+      // Accept any 10-digit number
+      if (cleaned.length === 10) {
         mobile = cleaned;
         break;
       }
     }
     if (!mobile) return null;
 
-    // Find name: first text column that isn't a number
-    let name = findCol(row, ['name','customer name','client name','lead name','doctor name','party name','contact name','full name']);
+    // Find name: check known name columns first, then fallback to first text cell
+    let name = findCol(row, ['name','customer name','client name','lead name','doctor name','party name','contact name','full name','doctor','client','contact person']);
     if (!name) {
       for (const k of keys) {
         const v = String(row[k] || '').trim();
@@ -121,9 +124,9 @@
       mobile:     mobile,
       age:        findCol(row, ['age','customer age']),
       gender:     findCol(row, ['gender','sex']),
-      city:       findCol(row, ['city','location','area','district']),
-      category:   findCol(row, ['category','speciality','type','doctor type','segment','product']),
-      sourceFile: findCol(row, ['source file','source','directory','batch','campaign','file name']) || 'Imported Leads',
+      city:       findCol(row, ['city','location','area','district','place']),
+      category:   findCol(row, ['category','speciality','type','doctor type','segment','product','specialization']),
+      sourceFile: findCol(row, ['source file','source','directory','batch','campaign','file name','sheet']) || 'Imported Leads',
       status:     findCol(row, ['status','call status']) || 'Pending'
     };
   }
@@ -191,10 +194,17 @@
     let uploaded = 0, skipped = 0;
     let batch = db.batch();
     let batchCount = 0;
+    const skippedSamples = [];
 
     for (let i = 0; i < rows.length; i++) {
       const docData = mapper(rows[i]);
-      if (!docData) { skipped++; continue; }
+      if (!docData) {
+        skipped++;
+        if (skippedSamples.length < 3) {
+          skippedSamples.push(JSON.stringify(rows[i]).slice(0, 120));
+        }
+        continue;
+      }
 
       let docRef;
       if (collectionName === 'users' && docData.name) {
@@ -216,6 +226,12 @@
     }
 
     if (batchCount > 0) await batch.commit();
+
+    if (skipped > 0 && skippedSamples.length > 0) {
+      log(`⚠️ ${skipped} rows skipped (no valid 10-digit number found). Sample skipped rows:`, 'error');
+      skippedSamples.forEach(s => log(`   ${s}`, 'error'));
+    }
+
     return { uploaded, skipped };
   }
 
