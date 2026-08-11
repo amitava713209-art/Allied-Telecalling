@@ -91,17 +91,40 @@
   }
 
   function mapLead(row) {
-    const mobile = findCol(row, ['mobile number','mobile','phone number','phone','contact number','contact','mob']);
+    const keys = Object.keys(row);
+
+    // Find mobile: scan ALL columns for a valid 10-digit Indian number
+    let mobile = '';
+    for (const k of keys) {
+      const val = String(row[k] || '').trim().replace(/\D/g, '');
+      let cleaned = val;
+      if (cleaned.length === 12 && cleaned.startsWith('91')) cleaned = cleaned.slice(2);
+      if (cleaned.length > 10) cleaned = cleaned.slice(-10);
+      if (cleaned.length === 10 && /^[6-9]/.test(cleaned)) {
+        mobile = cleaned;
+        break;
+      }
+    }
     if (!mobile) return null;
+
+    // Find name: first text column that isn't a number
+    let name = findCol(row, ['name','customer name','client name','lead name','doctor name','party name','contact name','full name']);
+    if (!name) {
+      for (const k of keys) {
+        const v = String(row[k] || '').trim();
+        if (v && isNaN(v) && v.length > 1 && v !== mobile) { name = v; break; }
+      }
+    }
+
     return {
-      name:       findCol(row, ['name','customer name','client name','lead name','doctor name','party name']),
-      mobile:     mobile.replace(/\D/g,'').slice(-10),
+      name:       name || 'Unknown',
+      mobile:     mobile,
       age:        findCol(row, ['age','customer age']),
       gender:     findCol(row, ['gender','sex']),
-      city:       findCol(row, ['city','location','area']),
-      category:   findCol(row, ['category','speciality','type','doctor type','segment']),
+      city:       findCol(row, ['city','location','area','district']),
+      category:   findCol(row, ['category','speciality','type','doctor type','segment','product']),
       sourceFile: findCol(row, ['source file','source','directory','batch','campaign','file name']) || 'Imported Leads',
-      status:     findCol(row, ['status']) || 'Pending'
+      status:     findCol(row, ['status','call status']) || 'Pending'
     };
   }
 
@@ -193,11 +216,15 @@
     log(`\n📂 Reading: ${file.name}`, 'info');
 
     parseFile(file, async (rows) => {
+      if (rows.length > 0) {
+        log(`📋 Columns found: ${Object.keys(rows[0]).join(' | ')}`, 'info');
+      }
       log(`Found ${rows.length} rows. Uploading to "${collectionName}"...`, 'info');
       try {
         const { uploaded, skipped } = await uploadRows(rows, collectionName, mapper);
-        log(`✅ Done! Uploaded: ${uploaded} | Skipped (empty): ${skipped}`, 'success');
-        log(`🎉 Refresh your Allied Calling app to see the data!`, 'success');
+        log(`✅ Done! Uploaded: ${uploaded} | Skipped (no mobile): ${skipped}`, 'success');
+        if (uploaded > 0) log(`🎉 Refresh your Allied Calling app to see the data!`, 'success');
+        else log(`⚠️ 0 uploaded - check column names above match Name/Mobile fields`, 'error');
       } catch(e) {
         log('❌ Upload error: ' + e.message, 'error');
       }
