@@ -3,147 +3,223 @@
 <head>
   <meta charset="UTF-8">
   <title>Firebase Migration Tool</title>
+  <!-- SheetJS for Excel support -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- PapaParse for CSV support -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: 0 auto; line-height: 1.6; }
-    .dropzone { border: 2px dashed #4f46e5; border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 2rem; background: #f8fafc; cursor: pointer; }
-    .dropzone:hover { background: #e0e7ff; }
-    h1 { color: #1e293b; }
-    .success { color: #059669; font-weight: bold; }
-    .error { color: #dc2626; font-weight: bold; }
+    body { font-family: sans-serif; padding: 2rem; max-width: 700px; margin: 0 auto; line-height: 1.6; background: #0f172a; color: #e2e8f0; }
+    h1 { color: #38bdf8; }
+    p { color: #94a3b8; }
+    .dropzone { border: 2px dashed #4f46e5; border-radius: 12px; padding: 2rem; text-align: center; margin-bottom: 1.5rem; background: #1e293b; cursor: pointer; transition: background 0.2s; }
+    .dropzone:hover, .dropzone.active { background: #312e81; border-color: #818cf8; }
+    .dropzone h3 { color: #a5b4fc; margin: 0 0 6px 0; }
+    .dropzone small { color: #64748b; }
+    .dropzone input[type=file] { display: none; }
+    #status { margin-top: 1rem; padding: 16px; border-radius: 8px; background: #1e293b; font-size: 13px; line-height: 2; max-height: 350px; overflow-y: auto; white-space: pre-wrap; }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+    .info { color: #60a5fa; }
   </style>
 </head>
 <body>
-  <h1>Allied Calling — Firebase Migration</h1>
-  <p>Instructions: Export your Google Sheets tabs as CSV files. Drag and drop them here one by one.</p>
+  <h1>🔥 Allied Calling — Firebase Migration Tool</h1>
+  <p>Supports <strong>Excel (.xlsx, .xls)</strong> and <strong>CSV</strong> files. Drag &amp; drop or click to browse.</p>
 
-  <div class="dropzone" id="users-drop">
-    <h3>1. Drop "Users.csv" here</h3>
+  <div class="dropzone" id="users-drop" onclick="document.getElementById('users-file').click()">
+    <h3>👤 1. Users File</h3>
+    <small>Drop Users.xlsx / Users.csv here</small>
+    <input type="file" id="users-file" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0], 'users-drop', 'users', mapUser)">
   </div>
 
-  <div class="dropzone" id="leads-drop">
-    <h3>2. Drop "Lead Queue.csv" here</h3>
+  <div class="dropzone" id="leads-drop" onclick="document.getElementById('leads-file').click()">
+    <h3>📋 2. Lead Queue File</h3>
+    <small>Drop Lead Queue.xlsx / Lead Queue.csv here</small>
+    <input type="file" id="leads-file" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0], 'leads-drop', 'leads', mapLead)">
   </div>
 
-  <div class="dropzone" id="logs-drop">
-    <h3>3. Drop "Call Logs.csv" here</h3>
+  <div class="dropzone" id="logs-drop" onclick="document.getElementById('logs-file').click()">
+    <h3>📞 3. Call Logs File</h3>
+    <small>Drop Call Logs.xlsx / Call Logs.csv here</small>
+    <input type="file" id="logs-file" accept=".xlsx,.xls,.csv" onchange="handleFile(this.files[0], 'logs-drop', 'call_logs', mapLog)">
   </div>
 
-  <div id="status"></div>
+  <div id="status">Ready. Drop a file above to begin...</div>
 
-  <script>
-    // Initialize Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyClDshgmFBrT4nc-CyyGkPTVHWL2MDnals",
-      authDomain: "allied-calling.firebaseapp.com",
-      projectId: "allied-calling",
-      storageBucket: "allied-calling.firebasestorage.app",
-      messagingSenderId: "739358896582",
-      appId: "1:739358896582:web:6912d108eb35990a1282c7"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+<script>
+  // Initialize Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyClDshgmFBrT4nc-CyyGkPTVHWL2MDnals",
+    authDomain: "allied-calling.firebaseapp.com",
+    projectId: "allied-calling",
+    storageBucket: "allied-calling.firebasestorage.app",
+    messagingSenderId: "739358896582",
+    appId: "1:739358896582:web:6912d108eb35990a1282c7"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    const statusEl = document.getElementById('status');
-    function showMsg(msg, isErr=false) {
-      statusEl.innerHTML += `<p class="${isErr ? 'error' : 'success'}">${msg}</p>`;
+  const statusEl = document.getElementById('status');
+  function log(msg, cls='info') {
+    statusEl.innerHTML += `<span class="${cls}">${msg}</span>\n`;
+    statusEl.scrollTop = statusEl.scrollHeight;
+  }
+
+  // --- Mappers: flexible column name matching ---
+  function findCol(row, aliases) {
+    const keys = Object.keys(row);
+    for (const alias of aliases) {
+      const found = keys.find(k => k.toLowerCase().trim() === alias.toLowerCase());
+      if (found) return String(row[found] || '').trim();
     }
+    return '';
+  }
 
-    function setupDropzone(id, collectionName, mapper) {
-      const el = document.getElementById(id);
-      el.addEventListener('dragover', e => { e.preventDefault(); el.style.background = '#e0e7ff'; });
-      el.addEventListener('dragleave', e => { e.preventDefault(); el.style.background = '#f8fafc'; });
-      el.addEventListener('drop', e => {
-        e.preventDefault();
-        el.style.background = '#f8fafc';
-        const file = e.dataTransfer.files[0];
-        if (!file) return;
-        
-        showMsg(`Processing ${file.name} for ${collectionName}...`);
-        
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: true,
-          complete: async function(results) {
-            const data = results.data;
-            showMsg(`Found ${data.length} records. Uploading...`);
-            let count = 0;
-            const batch = db.batch();
-            
-            for (let i = 0; i < data.length; i++) {
-              const docData = mapper(data[i]);
-              if (!docData) continue;
-              
-              let docRef;
-              if (collectionName === 'users' && docData.name) {
-                docRef = db.collection('users').doc(docData.name.toLowerCase());
-              } else {
-                docRef = db.collection(collectionName).doc();
-              }
-              
-              batch.set(docRef, docData);
-              count++;
-              
-              // Firestore limits batches to 500 operations
-              if (count % 400 === 0) {
-                await batch.commit();
-                showMsg(`Uploaded ${count}...`);
-              }
-            }
-            
-            if (count % 400 !== 0) {
-              await batch.commit();
-            }
-            showMsg(`✅ Finished uploading ${count} records to ${collectionName}!`);
-          },
-          error: function(err) { showMsg(`Error: ${err.message}`, true); }
-        });
+  function mapUser(row) {
+    const name = findCol(row, ['caller name','name','username','user name','caller']);
+    const pin  = findCol(row, ['pin','password','pass']);
+    if (!name) return null;
+    return {
+      name,
+      pin: pin || '1234',
+      status: findCol(row, ['status']) || 'Active',
+      role:   findCol(row, ['role','user role']) || 'Caller',
+      boundDevice: findCol(row, ['bound device id','bound device','device id','deviceid']) || ''
+    };
+  }
+
+  function mapLead(row) {
+    const mobile = findCol(row, ['mobile number','mobile','phone number','phone','contact number','contact','mob']);
+    if (!mobile) return null;
+    return {
+      name:       findCol(row, ['name','customer name','client name','lead name','doctor name','party name']),
+      mobile:     mobile.replace(/\D/g,'').slice(-10),
+      age:        findCol(row, ['age','customer age']),
+      gender:     findCol(row, ['gender','sex']),
+      city:       findCol(row, ['city','location','area']),
+      category:   findCol(row, ['category','speciality','type','doctor type','segment']),
+      sourceFile: findCol(row, ['source file','source','directory','batch','campaign','file name']) || 'Imported Leads',
+      status:     findCol(row, ['status']) || 'Pending'
+    };
+  }
+
+  function mapLog(row) {
+    const cust = findCol(row, ['customer name','name','client name']);
+    if (!cust) return null;
+    return {
+      timestamp:       findCol(row, ['timestamp','date','time','call date']) || new Date().toISOString(),
+      callerName:      findCol(row, ['caller name','agent name','caller','agent']),
+      customerName:    cust,
+      mobileNumber:    findCol(row, ['mobile number','mobile','phone']),
+      age:             findCol(row, ['age']),
+      gender:          findCol(row, ['gender']),
+      city:            findCol(row, ['city']),
+      callResult:      findCol(row, ['call result','status','result','outcome']),
+      appointmentDate: findCol(row, ['appointment date','appointment']),
+      biProduct:       findCol(row, ['bi product','product']),
+      comments:        findCol(row, ['comments','notes','remarks']),
+      audioBase64:     findCol(row, ['audio url','audio','recording'])
+    };
+  }
+
+  // --- Parse file (Excel or CSV) → array of row objects ---
+  function parseFile(file, callback) {
+    const name = file.name.toLowerCase();
+    const isExcel = name.endsWith('.xlsx') || name.endsWith('.xls');
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          callback(rows);
+        } catch(err) {
+          log('❌ Error reading Excel: ' + err.message, 'error');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: r => callback(r.data),
+        error: err => log('❌ Error reading CSV: ' + err.message, 'error')
       });
     }
+  }
 
-    // Mappers
-    setupDropzone('users-drop', 'users', row => ({
-      name: row['Caller Name'] || '',
-      pin: row['PIN'] || '',
-      status: row['Status'] || 'Active',
-      role: row['Role'] || 'Caller',
-      boundDevice: row['Bound Device ID'] || ''
-    }));
+  // --- Upload rows to Firestore ---
+  async function uploadRows(rows, collectionName, mapper) {
+    let uploaded = 0, skipped = 0;
+    let batch = db.batch();
+    let batchCount = 0;
 
-    setupDropzone('leads-drop', 'leads', row => {
-      if (!row['Mobile Number']) return null;
-      return {
-        id: row['ID'] || `lead_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
-        name: row['Name'] || '',
-        mobile: row['Mobile Number'] || '',
-        age: row['Age'] || '',
-        gender: row['Gender'] || '',
-        city: row['City'] || '',
-        category: row['Category'] || '',
-        sourceFile: row['Source File'] || '',
-        status: row['Status'] || 'Pending'
-      };
+    for (let i = 0; i < rows.length; i++) {
+      const docData = mapper(rows[i]);
+      if (!docData) { skipped++; continue; }
+
+      let docRef;
+      if (collectionName === 'users' && docData.name) {
+        docRef = db.collection('users').doc(docData.name.toLowerCase());
+      } else {
+        docRef = db.collection(collectionName).doc();
+      }
+
+      batch.set(docRef, docData);
+      uploaded++;
+      batchCount++;
+
+      if (batchCount === 400) {
+        await batch.commit();
+        log(`  ⏳ Uploaded ${uploaded} so far...`, 'info');
+        batch = db.batch();
+        batchCount = 0;
+      }
+    }
+
+    if (batchCount > 0) await batch.commit();
+    return { uploaded, skipped };
+  }
+
+  // --- Main handler ---
+  async function handleFile(file, dropId, collectionName, mapper) {
+    if (!file) return;
+    const dropEl = document.getElementById(dropId);
+    dropEl.style.background = '#312e81';
+    log(`\n📂 Reading: ${file.name}`, 'info');
+
+    parseFile(file, async (rows) => {
+      log(`Found ${rows.length} rows. Uploading to "${collectionName}"...`, 'info');
+      try {
+        const { uploaded, skipped } = await uploadRows(rows, collectionName, mapper);
+        log(`✅ Done! Uploaded: ${uploaded} | Skipped (empty): ${skipped}`, 'success');
+        log(`🎉 Refresh your Allied Calling app to see the data!`, 'success');
+      } catch(e) {
+        log('❌ Upload error: ' + e.message, 'error');
+      }
+      dropEl.style.background = '';
     });
+  }
 
-    setupDropzone('logs-drop', 'call_logs', row => {
-      if (!row['Customer Name']) return null;
-      return {
-        timestamp: row['Timestamp'] || new Date().toISOString(),
-        callerName: row['Caller Name'] || '',
-        customerName: row['Customer Name'] || '',
-        mobileNumber: row['Mobile Number'] || '',
-        age: row['Age'] || '',
-        gender: row['Gender'] || '',
-        city: row['City'] || '',
-        callResult: row['Call Result'] || '',
-        appointmentDate: row['Appointment Date'] || '',
-        biProduct: row['BI Product'] || '',
-        comments: row['Comments'] || '',
-        audioBase64: row['Audio URL'] || ''
-      };
+  // --- Drag & Drop support ---
+  ['users-drop','leads-drop','logs-drop'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    const fileInputId = ['users-file','leads-file','logs-file'][i];
+    const coll = ['users','leads','call_logs'][i];
+    const mapper = [mapUser, mapLead, mapLog][i];
+
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('active'); });
+    el.addEventListener('dragleave', () => el.classList.remove('active'));
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      el.classList.remove('active');
+      handleFile(e.dataTransfer.files[0], id, coll, mapper);
     });
-  </script>
+  });
+</script>
 </body>
 </html>
