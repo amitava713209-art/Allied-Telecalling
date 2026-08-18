@@ -319,7 +319,7 @@
       <i data-lucide="clock"></i>
       <span>History</span>
     </button>
-    <button class="nav-tab nav-sync" id="nav-btn-sync" onclick="fetchRemoteLogs(); fetchCentralLeadQueue();">
+    <button class="nav-tab nav-sync" id="nav-btn-sync" onclick="fetchRemoteLogs(); localStorage.removeItem('allied_leads_cache_ts'); fetchCentralLeadQueue(true);">
       <i data-lucide="refresh-cw"></i>
       <span>Sync</span>
     </button>

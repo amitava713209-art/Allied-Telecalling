@@ -1855,28 +1855,56 @@ async function syncCentralLeadQueue(newLeads, replace = false) {
 }
 
 let unsubscribeLeads = null;
-async function fetchCentralLeadQueue() {
-  if (!db) return;
-  try {
-    if (unsubscribeLeads) unsubscribeLeads(); // prevent duplicate listeners
+const LEADS_CACHE_KEY   = 'allied_leads_cache';
+const LEADS_CACHE_TS    = 'allied_leads_cache_ts';
+const CACHE_TTL_MS      = 4 * 60 * 60 * 1000; // 4 hours
 
-    unsubscribeLeads = db.collection('leads').onSnapshot((snapshot) => {
-      const remoteQueue = [];
-      snapshot.forEach(doc => {
-        remoteQueue.push({ id: doc.id, ...doc.data() });
-      });
-      
-      const wasEmpty = leadQueue.length === 0;
-      mergeLeadQueue(remoteQueue);
-      saveLeadQueueToLocalStorage();
-      renderLeadQueue();
-      
-      if (wasEmpty && remoteQueue.length > 0) {
-        showToast("Leads Ready", `${remoteQueue.length} leads loaded - start calling!`, "success");
+async function fetchCentralLeadQueue(forceSync = false) {
+  if (!db) return;
+
+  // Step 1: Load from localStorage INSTANTLY (zero Firestore reads)
+  const cached = localStorage.getItem(LEADS_CACHE_KEY);
+  const cachedTs = parseInt(localStorage.getItem(LEADS_CACHE_TS) || '0', 10);
+  const cacheAge = Date.now() - cachedTs;
+  const cacheValid = cached && cacheAge < CACHE_TTL_MS;
+
+  if (cached && leadQueue.length === 0) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        leadQueue = parsed;
+        renderLeadQueue();
+        if (!forceSync && cacheValid) {
+          // Cache is fresh — no Firestore read needed at all
+          return;
+        }
       }
-    });
+    } catch(e) {}
+  }
+
+  // Step 2: Only hit Firestore if cache is stale OR force sync requested
+  if (!forceSync && cacheValid && leadQueue.length > 0) return;
+
+  try {
+    showToast('🔄 Syncing leads...', 'Fetching latest leads from server...', 'info');
+    const snapshot = await db.collection('leads').get();
+    const remoteQueue = [];
+    snapshot.forEach(doc => remoteQueue.push({ id: doc.id, ...doc.data() }));
+
+    mergeLeadQueue(remoteQueue);
+
+    // Save fresh data + timestamp to localStorage cache
+    localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
+    localStorage.setItem(LEADS_CACHE_TS, String(Date.now()));
+    saveLeadQueueToLocalStorage();
+    renderLeadQueue();
+
+    if (remoteQueue.length > 0) {
+      showToast('✅ Leads Ready', `${leadQueue.length} leads loaded!`, 'success');
+    }
   } catch (err) {
-    console.warn("Could not fetch remote lead queue:", err);
+    console.warn('Could not fetch remote lead queue:', err);
+    showToast('⚠️ Offline Mode', 'Using cached leads. Sync when connection is restored.', 'info');
   }
 }
 
