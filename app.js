@@ -364,9 +364,22 @@ function openSettings() {
   const modal = document.getElementById("settings-modal");
   const urlInput = document.getElementById("web-app-url");
   const geminiInput = document.getElementById("gemini-api-key-input");
+  const geminiStatus = document.getElementById("gemini-key-status");
 
   urlInput.value = localStorage.getItem("telecaller_sheet_url") || "";
-  if (geminiInput) geminiInput.value = localStorage.getItem("gemini_api_key") || "";
+
+  const savedKey = localStorage.getItem("gemini_api_key") || "";
+  if (geminiInput) {
+    geminiInput.value = savedKey;
+  }
+  if (geminiStatus) {
+    if (savedKey) {
+      const masked = savedKey.slice(0, 6) + '••••••••' + savedKey.slice(-4);
+      geminiStatus.innerHTML = `✅ <strong>Key saved & active:</strong> <code style="background:#f0fdf4;padding:2px 6px;border-radius:4px;color:#16a34a;">${masked}</code>`;
+    } else {
+      geminiStatus.innerHTML = `⚠️ <span style="color:#dc2626;">No key saved yet. Paste your key above.</span>`;
+    }
+  }
 
   modal.classList.remove("hidden-modal");
   modal.style.display = "flex";

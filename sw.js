@@ -1,7 +1,7 @@
 /* Allied Telecalling PWA Service Worker
    Version: 2.0 — Mobile-First Build */
 
-const CACHE_NAME = 'allied-call-v9';
+const CACHE_NAME = 'allied-call-v10';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -48,17 +48,16 @@ self.addEventListener('fetch', event => {
   }
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      // Return cached version instantly, then refresh in background
-      const networkFetch = fetch(event.request).then(response => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => null);
-
-      return cached || networkFetch;
+    fetch(event.request).then(response => {
+      // Network first — always get latest app files
+      if (response && response.status === 200) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+      }
+      return response;
+    }).catch(() => {
+      // Fall back to cache only when offline
+      return caches.match(event.request);
     })
   );
 });
