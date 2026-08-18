@@ -1831,6 +1831,133 @@ function saveLeadQueueToLocalStorage() {
   localStorage.setItem("telecaller_lead_queue", JSON.stringify(leadQueue));
 }
 
+// ============================================================
+// PASTE & IMPORT - Permanent reliable lead import from any text
+// ============================================================
+function openPasteModal() {
+  const modal = document.getElementById('paste-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    document.getElementById('paste-numbers-input').value = '';
+    document.getElementById('paste-directory-name').value = '';
+    document.getElementById('paste-preview').textContent = '';
+    setTimeout(() => document.getElementById('paste-directory-name').focus(), 100);
+  }
+}
+
+function closePasteModal() {
+  const modal = document.getElementById('paste-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+// Live preview: count numbers as user types
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('paste-numbers-input');
+  if (ta) {
+    ta.addEventListener('input', () => {
+      const nums = extractNumbersFromText(ta.value);
+      const prev = document.getElementById('paste-preview');
+      if (prev) {
+        prev.textContent = nums.length > 0
+          ? `✅ ${nums.length} valid mobile number${nums.length > 1 ? 's' : ''} detected`
+          : 'No valid 10-digit numbers found yet...';
+        prev.style.color = nums.length > 0 ? '#16a34a' : '#94a3b8';
+      }
+    });
+  }
+});
+
+// Core extractor: finds ALL valid 10-digit Indian mobile numbers from any text
+function extractNumbersFromText(text) {
+  const found = [];
+  const seen = new Set();
+
+  // Step 1: match 10-digit blocks (handles spaces, dashes, dots between digits)
+  const raw = text.match(/[6-9][\d\s\.\-]{8,14}\d/g) || [];
+  raw.forEach(r => {
+    const digits = r.replace(/\D/g, '');
+    let d = digits;
+    if (d.length === 12 && d.startsWith('91')) d = d.slice(2);
+    if (d.length === 11 && d.startsWith('0'))  d = d.slice(1);
+    if (d.length === 10 && !seen.has(d)) { seen.add(d); found.push(d); }
+  });
+
+  // Step 2: plain 10-digit fallback for tightly packed numbers
+  const plain = text.match(/\d{10,12}/g) || [];
+  plain.forEach(r => {
+    let d = r;
+    if (d.length === 12 && d.startsWith('91')) d = d.slice(2);
+    if (d.length === 11 && d.startsWith('0'))  d = d.slice(1);
+    if (d.length === 10 && /^[6-9]/.test(d) && !seen.has(d)) {
+      seen.add(d); found.push(d);
+    }
+  });
+
+  return found;
+}
+
+async function importPastedNumbers() {
+  const text = (document.getElementById('paste-numbers-input').value || '').trim();
+  const rawDir = (document.getElementById('paste-directory-name').value || '').trim();
+  const directoryName = rawDir || 'Pasted Leads';
+
+  if (!text) {
+    showToast('Empty', 'Please paste some numbers first.', 'error');
+    return;
+  }
+
+  const numbers = extractNumbersFromText(text);
+  if (numbers.length === 0) {
+    showToast('No Numbers Found', 'Could not find any valid 10-digit mobile numbers in the pasted text.', 'error');
+    return;
+  }
+
+  closePasteModal();
+  showToast('Importing...', `Found ${numbers.length} numbers. Adding to lead queue...`, 'info');
+
+  // Deduplicate against existing queue
+  const existingMobiles = new Set(leadQueue.map(l => String(l.mobile)));
+  const newLeads = [];
+
+  numbers.forEach((mob, i) => {
+    if (existingMobiles.has(mob)) return; // skip duplicate
+
+    // Try to find a name near the number in the original text
+    const pos = text.indexOf(mob);
+    const surrounding = text.substring(Math.max(0, pos - 50), pos + mob.length + 30);
+    let name = surrounding.replace(mob, '').replace(/[^a-zA-Z\s]/g, ' ').trim().replace(/\s+/g, ' ');
+    if (!name || name.length < 2) name = `${directoryName} Lead ${i + 1}`;
+
+    newLeads.push({
+      id: `lead_paste_${Date.now()}_${i}`,
+      name: name,
+      mobile: mob,
+      category: 'Pasted',
+      sourceFile: directoryName,
+      status: 'Pending'
+    });
+  });
+
+  if (newLeads.length === 0) {
+    showToast('All Duplicates', 'All numbers already exist in your lead queue.', 'info');
+    return;
+  }
+
+  // Add to local queue
+  leadQueue = [...newLeads, ...leadQueue];
+  activeBatchDirectory = 'ALL';
+  saveLeadQueueToLocalStorage();
+  renderLeadQueue();
+
+  // Sync to Firebase
+  syncCentralLeadQueue(newLeads, false);
+
+  const skipped = numbers.length - newLeads.length;
+  showToast('✅ Leads Imported!',
+    `Added ${newLeads.length} leads to "${directoryName}"${skipped > 0 ? `. ${skipped} duplicates skipped.` : ''}`,
+    'success');
+}
+
 function clearLeadQueue() {
   if (confirm("Are you sure you want to clear all imported leads from the queue?")) {
     leadQueue = [];
