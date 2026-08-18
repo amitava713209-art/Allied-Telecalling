@@ -1559,15 +1559,20 @@ async function handleExcelUpload(event) {
       const mimeType = file.type || 'image/jpeg';
 
       // Call Gemini Vision API — tries multiple models with retry on overload
-      const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash'];
+      const MODELS = [
+        { ver: 'v1', name: 'gemini-2.0-flash' },
+        { ver: 'v1', name: 'gemini-1.5-flash' },
+        { ver: 'v1beta', name: 'gemini-2.0-flash' },
+        { ver: 'v1beta', name: 'gemini-pro-vision' },
+      ];
       let response = null;
       let lastError = '';
 
-      for (const model of MODELS) {
+      for (const { ver, name } of MODELS) {
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
             response = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+              `https://generativelanguage.googleapis.com/${ver}/models/${name}:generateContent?key=${geminiKey}`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1580,15 +1585,15 @@ async function handleExcelUpload(event) {
                 })
               }
             );
-            if (response.ok) break; // success
+            if (response.ok) break;
             const errBody = await response.json();
             lastError = errBody.error?.message || 'API error';
             if (lastError.includes('overloaded') && attempt < 2) {
-              await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
+              await new Promise(r => setTimeout(r, 2000));
             }
           } catch(e) { lastError = e.message; }
         }
-        if (response && response.ok) break; // found working model
+        if (response && response.ok) break;
       }
 
       if (!response || !response.ok) {
