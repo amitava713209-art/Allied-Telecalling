@@ -1558,31 +1558,41 @@ async function handleExcelUpload(event) {
 
       const mimeType = file.type || 'image/jpeg';
 
-      // Call Gemini Vision API
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  text: 'Extract ALL 10-digit mobile phone numbers from this image. Return ONLY the numbers, one per line, nothing else. Do not include any labels, names, or extra text - just the numbers.'
-                },
-                {
-                  inline_data: { mime_type: mimeType, data: base64 }
-                }
-              ]
-            }],
-            generationConfig: { temperature: 0, maxOutputTokens: 2048 }
-          })
-        }
-      );
+      // Call Gemini Vision API — tries multiple models with retry on overload
+      const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash'];
+      let response = null;
+      let lastError = '';
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error?.message || 'Gemini API error');
+      for (const model of MODELS) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [
+                    { text: 'Extract ALL 10-digit mobile phone numbers from this image. Return ONLY the numbers, one per line, nothing else.' },
+                    { inline_data: { mime_type: mimeType, data: base64 } }
+                  ]}],
+                  generationConfig: { temperature: 0, maxOutputTokens: 2048 }
+                })
+              }
+            );
+            if (response.ok) break; // success
+            const errBody = await response.json();
+            lastError = errBody.error?.message || 'API error';
+            if (lastError.includes('overloaded') && attempt < 2) {
+              await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
+            }
+          } catch(e) { lastError = e.message; }
+        }
+        if (response && response.ok) break; // found working model
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(lastError || 'All Gemini models failed. Please try again in a moment.');
       }
 
       const result = await response.json();
