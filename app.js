@@ -1497,31 +1497,54 @@ async function handleExcelUpload(event) {
       }
       const ret = await Tesseract.recognize(file, 'eng');
       const text = ret.data.text || "";
-      const lines = text.split(/\r?\n/);
+
+      // Strategy: scan ENTIRE OCR text at once for all 10-digit numbers
+      // This is far more reliable than line-by-line for table/list images
+      const allNumbers = [];
+      const seen = new Set();
+
+      // Find all sequences that could be mobile numbers (with optional spaces/dashes)
+      const rawMatches = text.match(/[6-9][\d\s\-]{8,12}\d/g) || [];
+      rawMatches.forEach(raw => {
+        const digits = raw.replace(/\D/g, '');
+        let cleaned = digits;
+        if (cleaned.length === 12 && cleaned.startsWith('91')) cleaned = cleaned.slice(2);
+        if (cleaned.length === 10 && !seen.has(cleaned)) {
+          seen.add(cleaned);
+          allNumbers.push(cleaned);
+        }
+      });
+
+      // Also try plain 10-digit scan as fallback (catches numbers starting with 8 etc.)
+      const plainMatches = text.match(/\d{10}/g) || [];
+      plainMatches.forEach(digits => {
+        if (!seen.has(digits) && /^[6-9]/.test(digits)) {
+          seen.add(digits);
+          allNumbers.push(digits);
+        }
+      });
+
       let parsedCount = 0;
       const newQueue = [];
 
-      lines.forEach((line, index) => {
-        const cleanLine = sanitizeText(line);
-        const mobMatch = cleanLine.match(/\b([6-9]\d{9})\b/);
-        if (mobMatch) {
-          const mob = mobMatch[1];
-          let candName = cleanLine.replace(mob, "").replace(/[^a-zA-Z\s]/g, " ").trim();
-          candName = candName.replace(/\s+/g, " ");
-          if (!candName || candName.length < 2) {
-            candName = `Image Lead ${parsedCount + 1}`;
-          }
-
-          newQueue.push({
-            id: `lead_ocr_${Date.now()}_${index}`,
-            name: candName,
-            mobile: mob,
-            category: "Image Scan",
-            sourceFile: directoryName,
-            status: "Pending"
-          });
-          parsedCount++;
+      allNumbers.forEach((mob, index) => {
+        // Try to find a name near this number in the text
+        const numPos = text.indexOf(mob);
+        const surroundingText = text.substring(Math.max(0, numPos - 60), numPos + mob.length + 20);
+        let candName = surroundingText.replace(mob, "").replace(/[^a-zA-Z\s]/g, " ").trim().replace(/\s+/g, " ");
+        if (!candName || candName.length < 2) {
+          candName = `Lead ${parsedCount + 1}`;
         }
+
+        newQueue.push({
+          id: `lead_ocr_${Date.now()}_${index}`,
+          name: candName,
+          mobile: mob,
+          category: "Image Scan",
+          sourceFile: directoryName,
+          status: "Pending"
+        });
+        parsedCount++;
       });
 
       if (parsedCount === 0) {
