@@ -363,10 +363,14 @@ function mergeLogs(remoteRecords) {
 function openSettings() {
   const modal = document.getElementById("settings-modal");
   const urlInput = document.getElementById("web-app-url");
-  
+  const geminiInput = document.getElementById("gemini-api-key-input");
+
   urlInput.value = localStorage.getItem("telecaller_sheet_url") || "";
+  if (geminiInput) geminiInput.value = localStorage.getItem("gemini_api_key") || "";
+
+  modal.classList.remove("hidden-modal");
   modal.style.display = "flex";
-  
+
   const testStatus = document.getElementById("test-conn-status");
   testStatus.textContent = urlInput.value ? "Configured (Not Tested)" : "Not Configured";
   testStatus.className = "test-status-text";
@@ -378,8 +382,9 @@ function closeSettings() {
 
 function saveSettings() {
   const urlInput = document.getElementById("web-app-url");
+  const geminiInput = document.getElementById("gemini-api-key-input");
   const rawUrl = urlInput.value.trim();
-  
+
   if (rawUrl && !rawUrl.startsWith("https://script.google.com/")) {
     showToast("Invalid URL", "Google Apps Script Web App URLs must start with https://script.google.com", "error");
     return;
@@ -387,14 +392,16 @@ function saveSettings() {
 
   localStorage.setItem("telecaller_sheet_url", rawUrl);
   sheetUrl = rawUrl;
-  
+
+  if (geminiInput && geminiInput.value.trim()) {
+    localStorage.setItem("gemini_api_key", geminiInput.value.trim());
+    showToast("✅ Settings Saved", "Gemini AI Vision key saved. Image scanning is now enterprise-grade!", "success");
+  } else {
+    showToast("Settings Saved", "Settings saved successfully.", "success");
+  }
+
   closeSettings();
   updateSyncBadge();
-  showToast("Settings Saved", "Google Sheets Sync configuration saved successfully.", "success");
-  
-  // Trigger syncing and fetch remote sheets data
-  syncPendingLogs();
-  fetchRemoteLogs();
 }
 
 async function testSheetConnection() {
@@ -1487,87 +1494,114 @@ async function handleExcelUpload(event) {
   const directoryName = sanitizeText(promptVal).trim() || defaultDirName || "General Batch";
   const isImage = ['.png', '.jpg', '.jpeg'].some(ext => fileName.endsWith(ext));
 
-  // --- IMAGE SCANNING OCR ENGINE ---
+  // --- ENTERPRISE AI IMAGE SCANNING (Gemini Vision) ---
   if (isImage) {
-    showToast("OCR Scanning...", "Reading leads and numbers from image sheet...", "info");
+    const geminiKey = localStorage.getItem('gemini_api_key') || '';
+
+    if (!geminiKey) {
+      showToast(
+        '🔑 Gemini API Key Required',
+        'Go to Settings → paste your free Gemini API key to enable AI image scanning.',
+        'error'
+      );
+      event.target.value = '';
+      return;
+    }
+
+    showToast('🤖 AI Scanning...', 'Gemini Vision is reading your image...', 'info');
+
     try {
-      if (typeof Tesseract === "undefined") {
-        showToast("OCR Engine", "Tesseract is loading, please try again in 3 seconds.", "error");
-        return;
+      // Convert image file to base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const mimeType = file.type || 'image/jpeg';
+
+      // Call Gemini Vision API
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  text: 'Extract ALL 10-digit mobile phone numbers from this image. Return ONLY the numbers, one per line, nothing else. Do not include any labels, names, or extra text - just the numbers.'
+                },
+                {
+                  inline_data: { mime_type: mimeType, data: base64 }
+                }
+              ]
+            }],
+            generationConfig: { temperature: 0, maxOutputTokens: 2048 }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || 'Gemini API error');
       }
-      const ret = await Tesseract.recognize(file, 'eng');
-      const text = ret.data.text || "";
 
-      // Strategy: scan ENTIRE OCR text at once for all 10-digit numbers
-      // This is far more reliable than line-by-line for table/list images
-      const allNumbers = [];
+      const result = await response.json();
+      const aiText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      // Extract all valid numbers from AI response
       const seen = new Set();
-
-      // Find all sequences that could be mobile numbers (with optional spaces/dashes)
-      const rawMatches = text.match(/[6-9][\d\s\-]{8,12}\d/g) || [];
-      rawMatches.forEach(raw => {
-        const digits = raw.replace(/\D/g, '');
-        let cleaned = digits;
-        if (cleaned.length === 12 && cleaned.startsWith('91')) cleaned = cleaned.slice(2);
-        if (cleaned.length === 10 && !seen.has(cleaned)) {
-          seen.add(cleaned);
-          allNumbers.push(cleaned);
-        }
-      });
-
-      // Also try plain 10-digit scan as fallback (catches numbers starting with 8 etc.)
-      const plainMatches = text.match(/\d{10}/g) || [];
-      plainMatches.forEach(digits => {
-        if (!seen.has(digits) && /^[6-9]/.test(digits)) {
-          seen.add(digits);
-          allNumbers.push(digits);
-        }
-      });
-
-      let parsedCount = 0;
       const newQueue = [];
+      let parsedCount = 0;
 
-      allNumbers.forEach((mob, index) => {
-        // Try to find a name near this number in the text
-        const numPos = text.indexOf(mob);
-        const surroundingText = text.substring(Math.max(0, numPos - 60), numPos + mob.length + 20);
-        let candName = surroundingText.replace(mob, "").replace(/[^a-zA-Z\s]/g, " ").trim().replace(/\s+/g, " ");
-        if (!candName || candName.length < 2) {
-          candName = `Lead ${parsedCount + 1}`;
+      const allDigits = aiText.match(/\d{10,12}/g) || [];
+      allDigits.forEach((raw, index) => {
+        let d = raw;
+        if (d.length === 12 && d.startsWith('91')) d = d.slice(2);
+        if (d.length === 11 && d.startsWith('0'))  d = d.slice(1);
+        if (d.length === 10 && !seen.has(d)) {
+          seen.add(d);
+          newQueue.push({
+            id: `lead_ai_${Date.now()}_${index}`,
+            name: `${directoryName} Lead ${parsedCount + 1}`,
+            mobile: d,
+            category: 'Image Scan',
+            sourceFile: directoryName,
+            status: 'Pending'
+          });
+          parsedCount++;
         }
-
-        newQueue.push({
-          id: `lead_ocr_${Date.now()}_${index}`,
-          name: candName,
-          mobile: mob,
-          category: "Image Scan",
-          sourceFile: directoryName,
-          status: "Pending"
-        });
-        parsedCount++;
       });
 
       if (parsedCount === 0) {
-        showToast("No Mobile Numbers", "Could not detect clear 10-digit mobile numbers in the image.", "error");
+        showToast('No Numbers Found', 'AI could not detect any 10-digit numbers in this image. Ensure image is clear.', 'error');
+        event.target.value = '';
         return;
       }
 
       const existingMobiles = new Set(leadQueue.map(l => String(l.mobile)));
       const dedupedNew = newQueue.filter(l => !existingMobiles.has(String(l.mobile)));
+      const dupes = parsedCount - dedupedNew.length;
 
       leadQueue = [...dedupedNew, ...leadQueue];
-      activeBatchDirectory = "ALL"; // show ALL directories so old data stays visible
+      activeBatchDirectory = 'ALL';
       saveLeadQueueToLocalStorage();
       renderLeadQueue();
       syncCentralLeadQueue(dedupedNew, false);
 
-      showToast("✅ Image Directory Created", `Loaded ${dedupedNew.length} leads into directory "${directoryName}"!`, "success");
+      showToast(
+        '✅ AI Scan Complete',
+        `${dedupedNew.length} leads added from image"${directoryName}"${dupes > 0 ? `. ${dupes} duplicates skipped.` : ''}`,
+        'success'
+      );
 
-    } catch (ocrErr) {
-      console.error("OCR Error:", ocrErr);
-      showToast("OCR Failed", "Failed to parse image. Please ensure text is clear.", "error");
+    } catch (aiErr) {
+      console.error('Gemini Vision Error:', aiErr);
+      showToast('AI Scan Failed', `Error: ${aiErr.message}. Check your API key in Settings.`, 'error');
     } finally {
-      event.target.value = "";
+      event.target.value = '';
     }
     return;
   }

@@ -337,13 +337,22 @@
 <div class="modal-overlay hidden-modal" id="settings-modal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3><i data-lucide="settings"></i> Google Sheets Setup</h3>
+      <h3><i data-lucide="settings"></i> App Settings</h3>
       <button class="modal-close-btn" onclick="closeSettings()"><i data-lucide="x"></i></button>
     </div>
     <div class="modal-body">
-      <p style="font-size:0.85rem;color:#64748b;margin-bottom:1rem;">Paste your Google Apps Script Web App URL below. All callers will sync to the same sheet automatically.</p>
+      <p style="font-size:0.85rem;color:#64748b;margin-bottom:1rem;">Configure your app settings below.</p>
+
+      <div class="form-field" style="margin-bottom:1rem;">
+        <label style="font-weight:600;color:#0f172a;">🤖 Gemini AI Vision API Key <span style="font-weight:400;color:#64748b;font-size:0.8rem;">(for image lead scanning)</span></label>
+        <input type="password" id="gemini-api-key-input" placeholder="Paste your Gemini API key here" style="font-family:monospace;">
+        <p style="font-size:0.78rem;color:#94a3b8;margin-top:4px;">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4f46e5;">aistudio.google.com</a> → Click "Create API Key" (free, takes 1 min)</p>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:1rem 0;">
+
       <div class="form-field">
-        <label>Web App URL</label>
+        <label>Google Sheets Web App URL <span style="font-weight:400;color:#94a3b8;font-size:0.8rem;">(optional, legacy)</span></label>
         <input type="url" id="web-app-url" placeholder="https://script.google.com/macros/s/.../exec">
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;">
