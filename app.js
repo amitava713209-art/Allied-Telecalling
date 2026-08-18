@@ -33,6 +33,16 @@ const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
 let sheetUrl = null; // Removed Google Sheets Url
 let editingRecordId = null;
 
+// Load Gemini key from Firebase at startup (so it works even after cache clears)
+(async () => {
+  try {
+    const doc = await db.collection('config').doc('gemini').get();
+    if (doc.exists && doc.data().apiKey) {
+      localStorage.setItem('gemini_api_key', doc.data().apiKey);
+    }
+  } catch(e) { /* use localStorage fallback */ }
+})();
+
 // --- Initialization on DOM Load ---
 document.addEventListener("DOMContentLoaded", () => {
   // 0. Check Security Access Authentication
@@ -360,7 +370,7 @@ function mergeLogs(remoteRecords) {
 }
 
 // --- Modal Settings Handlers ---
-function openSettings() {
+async function openSettings() {
   const modal = document.getElementById("settings-modal");
   const urlInput = document.getElementById("web-app-url");
   const geminiInput = document.getElementById("gemini-api-key-input");
@@ -368,16 +378,23 @@ function openSettings() {
 
   urlInput.value = localStorage.getItem("telecaller_sheet_url") || "";
 
-  const savedKey = localStorage.getItem("gemini_api_key") || "";
-  if (geminiInput) {
-    geminiInput.value = savedKey;
-  }
+  // Load Gemini key: try Firebase first, fallback to localStorage
+  let savedKey = localStorage.getItem("gemini_api_key") || "";
+  try {
+    const doc = await db.collection('config').doc('gemini').get();
+    if (doc.exists && doc.data().apiKey) {
+      savedKey = doc.data().apiKey;
+      localStorage.setItem("gemini_api_key", savedKey); // sync to localStorage
+    }
+  } catch(e) { /* offline - use localStorage */ }
+
+  if (geminiInput) geminiInput.value = savedKey;
   if (geminiStatus) {
     if (savedKey) {
       const masked = savedKey.slice(0, 6) + '••••••••' + savedKey.slice(-4);
-      geminiStatus.innerHTML = `✅ <strong>Key saved & active:</strong> <code style="background:#f0fdf4;padding:2px 6px;border-radius:4px;color:#16a34a;">${masked}</code>`;
+      geminiStatus.innerHTML = `✅ <strong>Key active:</strong> <code style="background:#f0fdf4;padding:2px 6px;border-radius:4px;color:#16a34a;">${masked}</code>`;
     } else {
-      geminiStatus.innerHTML = `⚠️ <span style="color:#dc2626;">No key saved yet. Paste your key above.</span>`;
+      geminiStatus.innerHTML = `⚠️ <span style="color:#dc2626;">No key saved yet.</span>`;
     }
   }
 
@@ -393,7 +410,7 @@ function closeSettings() {
   document.getElementById("settings-modal").style.display = "none";
 }
 
-function saveSettings() {
+async function saveSettings() {
   const urlInput = document.getElementById("web-app-url");
   const geminiInput = document.getElementById("gemini-api-key-input");
   const rawUrl = urlInput.value.trim();
@@ -406,9 +423,16 @@ function saveSettings() {
   localStorage.setItem("telecaller_sheet_url", rawUrl);
   sheetUrl = rawUrl;
 
-  if (geminiInput && geminiInput.value.trim()) {
-    localStorage.setItem("gemini_api_key", geminiInput.value.trim());
-    showToast("✅ Settings Saved", "Gemini AI Vision key saved. Image scanning is now enterprise-grade!", "success");
+  const geminiKey = geminiInput ? geminiInput.value.trim() : '';
+  if (geminiKey) {
+    // Save to BOTH localStorage AND Firebase so it persists forever on all devices
+    localStorage.setItem("gemini_api_key", geminiKey);
+    try {
+      await db.collection('config').doc('gemini').set({ apiKey: geminiKey });
+      showToast("✅ Settings Saved", "Gemini AI key saved to cloud. Works on all devices now!", "success");
+    } catch(e) {
+      showToast("✅ Settings Saved", "Gemini AI Vision key saved locally.", "success");
+    }
   } else {
     showToast("Settings Saved", "Settings saved successfully.", "success");
   }
@@ -2600,19 +2624,7 @@ function closeSettings() {
   }
 }
 
-function saveSettings() {
-  const input = document.getElementById("web-app-url");
-  if (input) {
-    const val = input.value.trim();
-    if (val) {
-      sheetUrl = val;
-      localStorage.setItem("telecaller_sheet_url", val);
-      showToast("Settings Saved", "Google Sheet URL configuration saved successfully.", "success");
-    }
-  }
-  closeSettings();
-  updateSyncBadge();
-}
+// (saveSettings is defined earlier in this file)
 
 function testSheetConnection() {
   const input = document.getElementById("web-app-url");
