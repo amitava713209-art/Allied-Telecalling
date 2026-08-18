@@ -33,15 +33,7 @@ const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
 let sheetUrl = null; // Removed Google Sheets Url
 let editingRecordId = null;
 
-// Load Gemini key from Firebase at startup (so it works even after cache clears)
-(async () => {
-  try {
-    const doc = await db.collection('config').doc('gemini').get();
-    if (doc.exists && doc.data().apiKey) {
-      localStorage.setItem('gemini_api_key', doc.data().apiKey);
-    }
-  } catch(e) { /* use localStorage fallback */ }
-})();
+// Gemini key is loaded from localStorage (set once via Settings)
 
 // --- Initialization on DOM Load ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -378,15 +370,8 @@ async function openSettings() {
 
   urlInput.value = localStorage.getItem("telecaller_sheet_url") || "";
 
-  // Load Gemini key: try Firebase first, fallback to localStorage
-  let savedKey = localStorage.getItem("gemini_api_key") || "";
-  try {
-    const doc = await db.collection('config').doc('gemini').get();
-    if (doc.exists && doc.data().apiKey) {
-      savedKey = doc.data().apiKey;
-      localStorage.setItem("gemini_api_key", savedKey); // sync to localStorage
-    }
-  } catch(e) { /* offline - use localStorage */ }
+  // Load Gemini key from localStorage only (no Firestore read)
+  const savedKey = localStorage.getItem("gemini_api_key") || "";
 
   if (geminiInput) geminiInput.value = savedKey;
   if (geminiStatus) {
@@ -425,14 +410,8 @@ async function saveSettings() {
 
   const geminiKey = geminiInput ? geminiInput.value.trim() : '';
   if (geminiKey) {
-    // Save to BOTH localStorage AND Firebase so it persists forever on all devices
     localStorage.setItem("gemini_api_key", geminiKey);
-    try {
-      await db.collection('config').doc('gemini').set({ apiKey: geminiKey });
-      showToast("✅ Settings Saved", "Gemini AI key saved to cloud. Works on all devices now!", "success");
-    } catch(e) {
-      showToast("✅ Settings Saved", "Gemini AI Vision key saved locally.", "success");
-    }
+    showToast("✅ Settings Saved", "Gemini AI key saved. Image scanning is now active!", "success");
   } else {
     showToast("Settings Saved", "Settings saved successfully.", "success");
   }
