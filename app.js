@@ -355,6 +355,7 @@ function mergeLogs(remoteRecords) {
       appointmentDate: raw.appointmentDate && raw.appointmentDate !== "N/A" ? raw.appointmentDate : "",
       biRequired: raw.biRequired === true || raw.biRequired === "Yes" || raw.biRequired === "YES",
       biProduct: raw.biProduct || "",
+      audioRecording: raw.audioBase64 || raw.audioRecording || raw.recordingUrl || raw.audioUrl || "",
       recordingUrl: raw.recordingUrl || raw.audioUrl || "",
       syncStatus: "Synced"
     };
@@ -988,9 +989,15 @@ function renderHistoryTable(filteredLogs = null) {
       const appointmentCell = `<td><div class="appt-info">${apptContent}</div></td>`;
       let audioCell = "<td><span class='text-muted' style='font-size:0.75rem;'>No recording</span></td>";
       if (record.audioRecording && record.audioRecording.length > 50) {
+        const downloadName = `Call_${(record.name || 'Lead').replace(/[^a-zA-Z0-9]/g, '_')}_${record.mobile || ''}.webm`;
         audioCell = `
           <td>
-            <audio controls style="height:30px; width:130px;" src="${record.audioRecording}"></audio>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <audio controls style="height:28px; width:130px;" src="${record.audioRecording}"></audio>
+              <a href="${record.audioRecording}" download="${downloadName}" class="icon-btn-sm" title="Download Audio" style="display:inline-flex; align-items:center; justify-content:center; padding:4px; border-radius:6px; background:#e0e7ff; color:#4338ca; text-decoration:none;">
+                <i data-lucide="download" style="width:14px; height:14px;"></i>
+              </a>
+            </div>
           </td>
         `;
       }
@@ -1117,9 +1124,15 @@ function renderHistoryTable(filteredLogs = null) {
 
       let audioPlayerHtml = "";
       if (record.audioRecording && record.audioRecording.length > 50) {
+        const downloadName = `Call_${(record.name || 'Lead').replace(/[^a-zA-Z0-9]/g, '_')}_${record.mobile || ''}.webm`;
         audioPlayerHtml = `
           <div class="m-card-detail-item" style="flex-direction:column; align-items:flex-start; margin-top:0.4rem;">
-            <span class="m-card-detail-label">Call Audio Recording:</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+              <span class="m-card-detail-label">🎙️ Call Audio Recording:</span>
+              <a href="${record.audioRecording}" download="${downloadName}" style="font-size:0.75rem; font-weight:600; color:#4f46e5; text-decoration:none; display:flex; align-items:center; gap:3px;">
+                <i data-lucide="download" style="width:12px; height:12px;"></i> Download Audio
+              </a>
+            </div>
             <audio controls style="height:32px; width:100%; margin-top:0.25rem;" src="${record.audioRecording}"></audio>
           </div>
         `;

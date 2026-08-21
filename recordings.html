@@ -1,0 +1,155 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allied Telecalling — Call Audio Recordings Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest" defer></script>
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="stylesheet" href="style.css?v=15">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <style>
+    body { background: #f8fafc; font-family: 'Inter', sans-serif; color: #1e293b; margin: 0; padding: 0; }
+    .rec-header { background: #4f46e5; color: #fff; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15); }
+    .rec-header h1 { font-size: 1.25rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+    .rec-container { max-width: 1000px; margin: 1.5rem auto; padding: 0 1rem; }
+    .filter-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+    .filter-card input, .filter-card select { padding: 0.6rem 0.85rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.9rem; outline: none; }
+    .rec-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+    .rec-card-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+    .rec-cust-name { font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+    .rec-cust-phone { font-family: monospace; color: #4f46e5; font-weight: 600; font-size: 0.95rem; margin-left: 0.5rem; }
+    .rec-meta { font-size: 0.82rem; color: #64748b; display: flex; gap: 1rem; flex-wrap: wrap; }
+    .rec-audio-row { display: flex; align-items: center; gap: 1rem; background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 10px; }
+    .rec-audio-row audio { flex: 1; height: 36px; }
+    .btn-dl { background: #4f46e5; color: #fff; padding: 0.55rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+    .btn-dl:hover { background: #4338ca; }
+    .badge-status { padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header class="rec-header">
+    <h1><i data-lucide="mic"></i> Allied Call Recordings Hub</h1>
+    <a href="index.html" style="color:#fff; text-decoration:none; font-size:0.88rem; font-weight:600; background:rgba(255,255,255,0.15); padding:0.45rem 0.9rem; border-radius:8px;">
+      &larr; Back to App
+    </a>
+  </header>
+
+  <div class="rec-container">
+    <div class="filter-card">
+      <input type="search" id="rec-search" placeholder="🔍 Search customer or caller..." oninput="renderRecordings()" style="flex:1; min-width:200px;">
+      <input type="date" id="rec-date" onchange="renderRecordings()">
+      <button type="button" class="btn-primary" onclick="loadRecordingsFromFirebase()" style="padding:0.6rem 1rem; font-size:0.88rem; background:#4f46e5; color:#fff; border:none; border-radius:8px; cursor:pointer;">
+        Refresh
+      </button>
+    </div>
+
+    <div id="rec-status-bar" style="margin-bottom:1rem; font-size:0.88rem; font-weight:600; color:#64748b;">
+      Loading recordings from cloud...
+    </div>
+
+    <div id="rec-list"></div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDummyKeyForCompatibility",
+      authDomain: "allied-calling.firebaseapp.com",
+      projectId: "allied-calling",
+      storageBucket: "allied-calling.appspot.com",
+      messagingSenderId: "1056581878564",
+      appId: "1:1056581878564:web:7a8109bf3b4c"
+    };
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+    let allRecords = [];
+
+    async function loadRecordingsFromFirebase() {
+      const statusBar = document.getElementById("rec-status-bar");
+      statusBar.textContent = "Fetching audio recordings from Firebase...";
+      try {
+        const snapshot = await db.collection("call_logs").orderBy("timestamp", "desc").limit(300).get();
+        allRecords = [];
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          const audio = d.audioBase64 || d.audioRecording || d.recordingUrl || "";
+          if (audio && audio.length > 50) {
+            allRecords.push({ id: doc.id, ...d, audio: audio });
+          }
+        });
+        statusBar.textContent = "Found " + allRecords.length + " calls with voice recordings attached.";
+        renderRecordings();
+      } catch (err) {
+        console.error("Fetch error:", err);
+        statusBar.textContent = "Could not fetch remote recordings: " + err.message;
+      }
+    }
+
+    function renderRecordings() {
+      const listEl = document.getElementById("rec-list");
+      const search = (document.getElementById("rec-search").value || "").toLowerCase().trim();
+      const dateVal = document.getElementById("rec-date").value;
+
+      const filtered = allRecords.filter(r => {
+        const name = (r.customerName || r.name || "").toLowerCase();
+        const mob = String(r.mobileNumber || r.mobile || "").toLowerCase();
+        const caller = (r.callerName || r.addedBy || "").toLowerCase();
+        const matchesSearch = name.includes(search) || mob.includes(search) || caller.includes(search);
+
+        let matchesDate = true;
+        if (dateVal && r.timestamp) {
+          const t = r.timestamp.slice(0, 10);
+          matchesDate = t === dateVal || String(r.timestamp).includes(dateVal);
+        }
+        return matchesSearch && matchesDate;
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div style="background:#fff; border-radius:12px; padding:3rem 1rem; text-align:center; color:#64748b;"><p style="font-size:1.1rem; font-weight:600;">No audio recordings matching your filter.</p><p style="font-size:0.88rem; margin-top:0.35rem;">Telecallers record voice notes using the 🎙️ Record button when saving a call.</p></div>';
+        if (window.lucide) window.lucide.createIcons();
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(r => {
+        const custName = r.customerName || r.name || "Customer";
+        const mob = r.mobileNumber || r.mobile || "N/A";
+        const caller = r.callerName || r.addedBy || "Telecaller";
+        const time = r.timestamp ? new Date(r.timestamp).toLocaleString() : "-";
+        const status = r.callResult || r.status || "Called";
+        const dlName = "Call_" + custName.replace(/[^a-zA-Z0-9]/g, '_') + "_" + mob + ".webm";
+
+        return '<div class="rec-card">' +
+          '<div class="rec-card-head">' +
+            '<div><span class="rec-cust-name">' + custName + '</span><span class="rec-cust-phone">' + mob + '</span></div>' +
+            '<span class="badge-status" style="background:#e0e7ff; color:#3730a3;">' + status + '</span>' +
+          '</div>' +
+          '<div class="rec-meta">' +
+            '<span>👤 Caller: <strong>' + caller + '</strong></span>' +
+            '<span>🕒 Call Time: <strong>' + time + '</strong></span>' +
+            (r.appointmentDate && r.appointmentDate !== 'N/A' ? '<span style="color:#059669;">📅 Appt: <strong>' + r.appointmentDate + '</strong></span>' : '') +
+          '</div>' +
+          (r.comments && r.comments !== 'N/A' ? '<div style="font-size:0.85rem; color:#475569; background:#f8fafc; padding:0.5rem 0.75rem; border-radius:6px; border-left:3px solid #6366f1;">📝 ' + r.comments + '</div>' : '') +
+          '<div class="rec-audio-row">' +
+            '<audio controls src="' + r.audio + '"></audio>' +
+            '<a href="' + r.audio + '" download="' + dlName + '" class="btn-dl">Download Audio</a>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadRecordingsFromFirebase();
+      if (window.lucide) window.lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
