@@ -546,10 +546,11 @@ function handleFormSubmit(event) {
   const ageInput = document.getElementById("customer-age");
   const genderInput = document.getElementById("customer-gender");
   const statusInput = document.querySelector('input[name="call-status"]:checked');
-  const appointmentGiven = document.getElementById("appointment-given").checked;
-  const appointmentDate = document.getElementById("appointment-date").value;
-  const biRequired = document.getElementById("bi-required").checked;
-  const biProduct = document.getElementById("bi-product").value;
+  const appointmentChecked = document.getElementById("appointment-given") ? document.getElementById("appointment-given").checked : false;
+  const appointmentDate = document.getElementById("appointment-date") ? document.getElementById("appointment-date").value : "";
+  const appointmentGiven = appointmentChecked || Boolean(appointmentDate && appointmentDate.trim() !== "");
+  const biRequired = document.getElementById("bi-required") ? document.getElementById("bi-required").checked : false;
+  const biProduct = document.getElementById("bi-product") ? document.getElementById("bi-product").value : "";
   const commentsInput = document.getElementById("call-comments");
 
   // 1. Validation Checks
@@ -861,7 +862,7 @@ function recalculateAnalytics() {
   const hotEl = document.getElementById("stat-hot-list");
   if (hotEl) hotEl.innerHTML = `${hotCount} <span class="percentage" id="stat-hot-list-pct">(${hotPct}%)</span>`;
 
-  const apptsCount = callLogs.filter(r => r.appointmentGiven).length;
+  const apptsCount = callLogs.filter(r => r.appointmentGiven === true || (Boolean(r.appointmentDate) && r.appointmentDate !== "N/A" && r.appointmentDate !== "-")).length;
   const apptsPct = totalCalls > 0 ? Math.round((apptsCount / totalCalls) * 100) : 0;
   document.getElementById("stat-appointments").innerHTML = `${apptsCount} <span class="percentage" id="stat-appointments-pct">(${apptsPct}%)</span>`;
 
