@@ -2582,10 +2582,19 @@ async function handleCallerLogin(event) {
 
     let userData;
 
+    const PRECONFIGURED_USERS = {
+      'admin': { name: 'Admin', pin: '1234', role: 'Admin', status: 'Active', boundDevice: '' },
+      'jayeeta': { name: 'Jayeeta', pin: '4321', role: 'Caller', status: 'Active', boundDevice: '' },
+      'moupriya': { name: 'Moupriya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' },
+      'priya': { name: 'Priya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' }
+    };
+
+    const cleanUsername = nameVal.toLowerCase().trim();
+
     if (!userDoc.exists) {
-      // Self-Healing: Auto-create Admin if it doesn't exist
-      if (nameVal.toLowerCase() === 'admin' && pinVal === '1234') {
-        userData = { name: 'Admin', pin: '1234', role: 'Admin', status: 'Active', boundDevice: '' };
+      // Auto-provision recognized user profiles if they don't exist yet in Firestore
+      if (PRECONFIGURED_USERS[cleanUsername] && PRECONFIGURED_USERS[cleanUsername].pin === pinVal) {
+        userData = { ...PRECONFIGURED_USERS[cleanUsername] };
         await userRef.set(userData);
       } else {
         showErr('Error: Invalid Name or Security PIN.');
@@ -2593,6 +2602,11 @@ async function handleCallerLogin(event) {
       }
     } else {
       userData = userDoc.data();
+      // If PIN is updated in code for a preconfigured user, auto-sync it
+      if (PRECONFIGURED_USERS[cleanUsername] && PRECONFIGURED_USERS[cleanUsername].pin === pinVal && userData.pin !== pinVal) {
+        userData.pin = pinVal;
+        await userRef.update({ pin: pinVal });
+      }
     }
 
     if (String(userData.pin).trim() !== pinVal) {
