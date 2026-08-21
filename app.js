@@ -331,29 +331,55 @@ async function fetchRemoteLogs() {
 
 window.fetchRemoteLogs = fetchRemoteLogs;
 
-// De-duplicate team records retrieved from Sheet
+// De-duplicate team records retrieved from Sheet / Firebase
 function mergeLogs(remoteRecords) {
   const mergedMap = new Map();
 
-  // 1. Process remote records (Sheet is source of truth)
-  remoteRecords.forEach((record, idx) => {
-    const key = record.id || (record.mobile ? `mob_${record.mobile}` : `rec_${idx}`);
-    mergedMap.set(key, record);
+  // 1. Process remote records (normalize fields from Firestore / Sheet)
+  remoteRecords.forEach((raw, idx) => {
+    if (!raw) return;
+    const cleanRecord = {
+      id: raw.id || `rec_${idx}`,
+      timestamp: raw.timestamp || raw.callDate || new Date().toISOString(),
+      name: raw.name || raw.customerName || raw.doctorName || "N/A",
+      mobile: raw.mobile || raw.mobileNumber || "",
+      addedBy: raw.addedBy || raw.callerName || raw.telecaller || "N/A",
+      status: raw.status || raw.callResult || raw.result || "Thinking",
+      age: raw.age || "",
+      gender: raw.gender || "",
+      comments: raw.comments || raw.remarks || "",
+      appointmentGiven: raw.appointmentGiven === true || raw.appointmentGiven === "Yes" || raw.appointmentGiven === "YES",
+      appointmentDate: raw.appointmentDate || "",
+      biRequired: raw.biRequired === true || raw.biRequired === "Yes" || raw.biRequired === "YES",
+      biProduct: raw.biProduct || "",
+      recordingUrl: raw.recordingUrl || raw.audioUrl || "",
+      syncStatus: "Synced"
+    };
+    const key = cleanRecord.id || (cleanRecord.mobile ? `mob_${cleanRecord.mobile}` : `rec_${idx}`);
+    mergedMap.set(key, cleanRecord);
   });
 
-  // 2. Add local records that aren't synced or aren't in the sheet yet
+  // 2. Add local records that aren't synced or aren't in the remote list yet
   callLogs.forEach((record, idx) => {
-    const key = record.id || (record.mobile ? `mob_${record.mobile}` : `local_${idx}`);
+    if (!record) return;
+    const cleanLocal = {
+      ...record,
+      name: record.name || record.customerName || "N/A",
+      mobile: record.mobile || record.mobileNumber || "",
+      addedBy: record.addedBy || record.callerName || "N/A",
+      status: record.status || record.callResult || "Thinking"
+    };
+    const key = cleanLocal.id || (cleanLocal.mobile ? `mob_${cleanLocal.mobile}` : `local_${idx}`);
     if (!mergedMap.has(key)) {
-      mergedMap.set(key, record);
+      mergedMap.set(key, cleanLocal);
     } else {
-      if (record.syncStatus === "Pending") {
-        mergedMap.set(key, record);
+      if (cleanLocal.syncStatus === "Pending") {
+        mergedMap.set(key, cleanLocal);
       }
     }
   });
 
-  // 3. Convert back and sort descending by timestamp (or array order)
+  // 3. Convert back and sort descending by timestamp
   callLogs = Array.from(mergedMap.values()).sort((a, b) => {
     const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
     const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
@@ -1220,6 +1246,32 @@ function clearDateFilter() {
 
 function getLocalDateISO(dateInput) {
   if (!dateInput) return "";
+  if (typeof dateInput === 'object' && dateInput.toDate) {
+    dateInput = dateInput.toDate();
+  } else if (typeof dateInput === 'object' && dateInput.seconds) {
+    dateInput = new Date(dateInput.seconds * 1000);
+  }
+  
+  if (typeof dateInput === 'string') {
+    const trimmed = dateInput.trim();
+    // DD/MM/YYYY or DD-MM-YYYY
+    const ddmmyyyy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (ddmmyyyy) {
+      const day = ddmmyyyy[1].padStart(2, '0');
+      const month = ddmmyyyy[2].padStart(2, '0');
+      const year = ddmmyyyy[3];
+      return `${year}-${month}-${day}`;
+    }
+    // YYYY-MM-DD
+    const yyyymmdd = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (yyyymmdd) {
+      const year = yyyymmdd[1];
+      const month = yyyymmdd[2].padStart(2, '0');
+      const day = yyyymmdd[3].padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  }
+
   const d = new Date(dateInput);
   if (isNaN(d.getTime())) return "";
   const year = d.getFullYear();
