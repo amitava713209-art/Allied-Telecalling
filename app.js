@@ -2583,10 +2583,10 @@ async function handleCallerLogin(event) {
     let userData;
 
     const PRECONFIGURED_USERS = {
-      'admin': { name: 'Admin', pin: '1234', role: 'Admin', status: 'Active', boundDevice: '' },
-      'jayeeta': { name: 'Jayeeta', pin: '4321', role: 'Caller', status: 'Active', boundDevice: '' },
-      'moupriya': { name: 'Moupriya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' },
-      'priya': { name: 'Priya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' }
+      'admin': { name: 'admin', pin: '1234', role: 'Admin', status: 'Active', boundDevice: '' },
+      'jayeeta': { name: 'jayeeta', pin: '4321', role: 'Caller', status: 'Active', boundDevice: '' },
+      'moupriya': { name: 'moupriya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' },
+      'priya': { name: 'priya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' }
     };
 
     const cleanUsername = nameVal.toLowerCase().trim();
@@ -2602,10 +2602,14 @@ async function handleCallerLogin(event) {
       }
     } else {
       userData = userDoc.data();
-      // If PIN is updated in code for a preconfigured user, auto-sync it
-      if (PRECONFIGURED_USERS[cleanUsername] && PRECONFIGURED_USERS[cleanUsername].pin === pinVal && userData.pin !== pinVal) {
-        userData.pin = pinVal;
-        await userRef.update({ pin: pinVal });
+      // If PIN or name casing is updated in code for a preconfigured user, auto-sync it
+      if (PRECONFIGURED_USERS[cleanUsername] && PRECONFIGURED_USERS[cleanUsername].pin === pinVal) {
+        const expectedName = PRECONFIGURED_USERS[cleanUsername].name;
+        if (userData.pin !== pinVal || userData.name !== expectedName) {
+          userData.pin = pinVal;
+          userData.name = expectedName;
+          await userRef.update({ pin: pinVal, name: expectedName });
+        }
       }
     }
 
