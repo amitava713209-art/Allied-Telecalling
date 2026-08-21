@@ -170,19 +170,31 @@ function toggleAppointmentField() {
   const appointmentGivenCheckbox = document.getElementById("appointment-given");
   const appointmentDateGroup = document.getElementById("appointment-date-group");
   const appointmentDateInput = document.getElementById("appointment-date");
+  if (!appointmentGivenCheckbox || !appointmentDateGroup) return;
 
   if (appointmentGivenCheckbox.checked) {
-    appointmentDateGroup.classList.add("active");
-    appointmentDateInput.required = true;
-    
-    // Set a default minimum date to "now"
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    appointmentDateInput.min = now.toISOString().slice(0, 16);
+    appointmentDateGroup.style.display = "block";
+    if (appointmentDateInput) {
+      appointmentDateInput.required = true;
+      if (!appointmentDateInput.value) {
+        // Pre-fill with tomorrow at 10:00 AM by default for easy scheduling
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(10, 0, 0, 0);
+        const yyyy = tomorrow.getFullYear();
+        const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+        const dd = String(tomorrow.getDate()).padStart(2, '0');
+        const hh = String(tomorrow.getHours()).padStart(2, '0');
+        const min = String(tomorrow.getMinutes()).padStart(2, '0');
+        appointmentDateInput.value = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+      }
+    }
   } else {
-    appointmentDateGroup.classList.remove("active");
-    appointmentDateInput.required = false;
-    appointmentDateInput.value = "";
+    appointmentDateGroup.style.display = "none";
+    if (appointmentDateInput) {
+      appointmentDateInput.required = false;
+      appointmentDateInput.value = "";
+    }
   }
 }
 

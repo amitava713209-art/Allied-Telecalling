@@ -830,6 +830,58 @@ button, input, select, textarea {
 .appt-time { display: flex; align-items: center; gap: 0.2rem; font-size: 0.72rem; color: #64748b; }
 .appt-time svg { width: 10px; height: 10px; }
 
+/* ---- Appointment Scheduler Box in Form ---- */
+.appointment-card-box {
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.appointment-card-box:hover {
+  border-color: #22c55e;
+}
+
+.appointment-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.appointment-toggle-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #16a34a;
+  cursor: pointer;
+}
+
+.appt-checkbox-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.appt-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #15803d;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.appt-title svg {
+  width: 16px;
+  height: 16px;
+}
+
+.appt-sub {
+  font-size: 0.75rem;
+  color: #166534;
+}
+
 /* ---- LOG CALL FORM ---- */
 #tab-form {
   background: #f8fafc;

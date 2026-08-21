@@ -143,18 +143,6 @@
       </div>
 
       <form id="call-form" onsubmit="handleFormSubmit(event)" class="call-form" id="form-panel-section">
-        <!-- Hidden element for resetForm compatibility -->
-        <div style="display:none">
-          <div id="appointment-date-group">
-            <input type="datetime-local" id="appointment-date">
-          </div>
-          <div id="bi-product-group"></div>
-          <div id="appointment-toggle-row" class="hidden-toggle">
-            <input type="checkbox" id="appointment-given" onchange="toggleAppointmentField()">
-          </div>
-          <input type="checkbox" id="bi-required" onchange="toggleBiField()">
-        </div>
-
         <div class="form-field">
           <label>Your Name</label>
           <input type="text" id="caller-name" placeholder="Enter your name" required autocomplete="off">
@@ -217,6 +205,30 @@
               <input type="radio" name="call-status" value="Refused"> 🚫 Refused
             </label>
           </div>
+        </div>
+
+        <!-- 📅 APPOINTMENT / MEETING SCHEDULER -->
+        <div class="appointment-card-box" id="appointment-toggle-row">
+          <label class="appointment-toggle-label">
+            <input type="checkbox" id="appointment-given" onchange="toggleAppointmentField()">
+            <div class="appt-checkbox-content">
+              <span class="appt-title"><i data-lucide="calendar-plus"></i> Schedule Meeting / Appointment</span>
+              <span class="appt-sub">Check if customer agreed to a meeting or appointment</span>
+            </div>
+          </label>
+
+          <div id="appointment-date-group" class="appointment-expand-group" style="display:none; margin-top:0.75rem;">
+            <label style="font-size:0.8rem; font-weight:600; color:#1e293b; margin-bottom:0.35rem; display:block;">
+              Meeting Date & Time <span class="req">*</span>
+            </label>
+            <input type="datetime-local" id="appointment-date" style="width:100%; border:1.5px solid #16a34a; background:#fff; border-radius:8px; padding:0.6rem 0.75rem; font-size:0.9rem;">
+          </div>
+        </div>
+
+        <!-- Hidden legacy compatibility tags -->
+        <div style="display:none">
+          <input type="checkbox" id="bi-required" onchange="toggleBiField()">
+          <div id="bi-product-group"></div>
         </div>
 
         <div class="form-field">
