@@ -882,17 +882,13 @@ function renderHistoryTable(filteredLogs = null) {
 
   // Empty state handling
   if (activeLogs.length === 0) {
-    const offlineWarning = !sheetUrl 
-      ? `<p class="field-hint" style="color:#b45309; font-weight: 600; margin-top: 0.75rem; text-align: center; max-width: 320px;">⚠️ Sheets Offline: Configure your Google Sheets Sync URL in Settings (⚙️) to retrieve and search logs from other callers.</p>` 
-      : "";
-
+    const totalCount = callLogs.length;
     const emptyStateHtml = `
       <div class="empty-state" style="padding: 2.5rem 1rem; text-align: center;">
         <i data-lucide="clipboard-list" class="empty-icon"></i>
         <h3>No call logs matching selected date/filter</h3>
-        <p style="margin-top:0.25rem; color:#64748b;">Your Google Sheet has 57 records. Clear the date box or click below to view all historical records.</p>
-        <button type="button" class="btn-primary" onclick="clearDateFilter()" style="margin-top:0.85rem; padding:0.45rem 1rem; font-weight:600;">Show All 57 Historical Logs</button>
-        ${offlineWarning}
+        <p style="margin-top:0.25rem; color:#64748b;">No records found for the current search/date. Clear the filter to view all historical logs.</p>
+        <button type="button" class="btn-primary" onclick="clearDateFilter(); document.getElementById('search-input').value=''; filterCallHistory();" style="margin-top:0.85rem; padding:0.45rem 1rem; font-weight:600;">Show All ${totalCount} Historical Logs</button>
       </div>
     `;
     
