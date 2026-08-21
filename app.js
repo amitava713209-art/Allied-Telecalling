@@ -1500,8 +1500,49 @@ function escapeCsvString(str) {
   return str.replace(/"/g, '""');
 }
 
+// --- 🎙️ Mandatory Microphone Verification Gate ---
+async function verifyMicrophoneAccess() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // If granted, release temporary test stream
+    stream.getTracks().forEach(track => track.stop());
+    hideMicPermissionModal();
+    return true;
+  } catch (err) {
+    console.warn("Microphone access denied or blocked:", err);
+    showMicPermissionModal();
+    return false;
+  }
+}
+
+function showMicPermissionModal() {
+  const modal = document.getElementById("mic-permission-modal");
+  if (modal) {
+    modal.classList.remove("hidden-modal");
+    modal.style.display = "flex";
+    if (window.lucide) window.lucide.createIcons();
+  }
+}
+
+function hideMicPermissionModal() {
+  const modal = document.getElementById("mic-permission-modal");
+  if (modal) {
+    modal.classList.add("hidden-modal");
+    modal.style.display = "none";
+  }
+}
+
+async function requestAndVerifyMicrophoneGate() {
+  const granted = await verifyMicrophoneAccess();
+  if (granted) {
+    showToast("Microphone Active", "Microphone verified successfully. Workstation unlocked!", "success");
+  } else {
+    showToast("Access Blocked", "Please allow microphone access in Chrome to make calls.", "error");
+  }
+}
+
 // --- 📞 Click-to-Call & 💬 WhatsApp Direct Launcher ---
-function triggerClickToCall(targetMobile = null) {
+async function triggerClickToCall(targetMobile = null) {
   const mob = targetMobile || document.getElementById("mobile-number").value.trim();
   const cleanMobile = mob.replace(/[^0-9]/g, "");
   if (!cleanMobile || cleanMobile.length < 10) {
@@ -1509,10 +1550,17 @@ function triggerClickToCall(targetMobile = null) {
     return;
   }
 
-  // 1. Auto-start recording before launching native SIM dialer
-  startAutoCallRecording();
+  // 1. Mandatory Mic Gate Check: Block call if microphone is not permitted
+  const micOk = await verifyMicrophoneAccess();
+  if (!micOk) {
+    showToast("Call Blocked", "Microphone permission is mandatory for call recording & audits.", "error");
+    return;
+  }
 
-  // 2. Trigger native SIM phone dialer
+  // 2. Auto-start recording before launching native SIM dialer
+  await startAutoCallRecording();
+
+  // 3. Trigger native SIM phone dialer
   window.location.href = `tel:${cleanMobile}`;
   showToast("Calling & Recording", `Initiating call for ${cleanMobile}. Recording started automatically!`, "info");
 }
