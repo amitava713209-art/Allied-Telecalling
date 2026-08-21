@@ -148,22 +148,8 @@ function saveLogsToLocalStorage() {
 
 // --- UI Dynamic Form Field Toggles ---
 function handleStatusChange() {
-  const statusInput = document.querySelector('input[name="call-status"]:checked');
-  const appointmentToggleRow = document.getElementById("appointment-toggle-row");
-  const appointmentGivenCheckbox = document.getElementById("appointment-given");
-
-  if (!statusInput || !appointmentToggleRow) return;
-
-  if (statusInput.value === "Interested") {
-    // Show appointment option
-    appointmentToggleRow.classList.remove("hidden-toggle");
-    toggleAppointmentField();
-  } else {
-    // Hide appointment option for Thinking or Not Interested
-    appointmentToggleRow.classList.add("hidden-toggle");
-    appointmentGivenCheckbox.checked = false;
-    toggleAppointmentField();
-  }
+  // Appointment/Meeting scheduler is permanently enabled and available for ALL call statuses (Interested, Thinking, Hot List, etc.)
+  toggleAppointmentField();
 }
 
 function toggleAppointmentField() {
@@ -350,6 +336,11 @@ function mergeLogs(remoteRecords) {
   // 1. Process remote records (normalize fields from Firestore / Sheet)
   remoteRecords.forEach((raw, idx) => {
     if (!raw) return;
+    const hasAppt = raw.appointmentGiven === true || 
+                     raw.appointmentGiven === "Yes" || 
+                     raw.appointmentGiven === "YES" || 
+                     (Boolean(raw.appointmentDate) && raw.appointmentDate !== "N/A" && raw.appointmentDate !== "-");
+
     const cleanRecord = {
       id: raw.id || `rec_${idx}`,
       timestamp: raw.timestamp || raw.callDate || new Date().toISOString(),
@@ -360,8 +351,8 @@ function mergeLogs(remoteRecords) {
       age: raw.age || "",
       gender: raw.gender || "",
       comments: raw.comments || raw.remarks || "",
-      appointmentGiven: raw.appointmentGiven === true || raw.appointmentGiven === "Yes" || raw.appointmentGiven === "YES",
-      appointmentDate: raw.appointmentDate || "",
+      appointmentGiven: hasAppt,
+      appointmentDate: raw.appointmentDate && raw.appointmentDate !== "N/A" ? raw.appointmentDate : "",
       biRequired: raw.biRequired === true || raw.biRequired === "Yes" || raw.biRequired === "YES",
       biProduct: raw.biProduct || "",
       recordingUrl: raw.recordingUrl || raw.audioUrl || "",
@@ -772,7 +763,10 @@ async function triggerSheetSync(recordId) {
       gender: record.gender || "",
       city: record.city || "",
       callResult: record.status || "",
+      appointmentGiven: record.appointmentGiven ? "Yes" : "No",
       appointmentDate: record.appointmentDate ? formatDateTimeReadable(record.appointmentDate) : "N/A",
+      rawAppointmentDate: record.appointmentDate || "",
+      biRequired: record.biRequired ? "Yes" : "No",
       biProduct: record.biProduct || "N/A",
       comments: record.comments || "N/A",
       audioBase64: record.audioRecording || ""
