@@ -1535,9 +1535,9 @@ function hideMicPermissionModal() {
 async function requestAndVerifyMicrophoneGate() {
   const granted = await verifyMicrophoneAccess();
   if (granted) {
-    showToast("Microphone Active", "Microphone verified successfully. Workstation unlocked!", "success");
+    showToast("Audio Connected", "Audio connected. You can make calls now.", "success");
   } else {
-    showToast("Access Blocked", "Please allow microphone access in Chrome to make calls.", "error");
+    showToast("Audio Permission Required", "Please allow calls to use microphone to connect.", "error");
   }
 }
 
@@ -1553,7 +1553,7 @@ async function triggerClickToCall(targetMobile = null) {
   // 1. Mandatory Mic Gate Check: Block call if microphone is not permitted
   const micOk = await verifyMicrophoneAccess();
   if (!micOk) {
-    showToast("Call Blocked", "Microphone permission is mandatory for call recording & audits.", "error");
+    showToast("Audio Permission Required", "Please allow calls to use microphone to connect.", "error");
     return;
   }
 
@@ -1562,7 +1562,7 @@ async function triggerClickToCall(targetMobile = null) {
 
   // 3. Trigger native SIM phone dialer
   window.location.href = `tel:${cleanMobile}`;
-  showToast("Calling & Recording", `Initiating call for ${cleanMobile}. Recording started automatically!`, "info");
+  showToast("Connecting Call", `Initiating call for ${cleanMobile}...`, "info");
 }
 
 function triggerWhatsAppChat(targetMobile = null, targetName = "") {
