@@ -1518,16 +1518,13 @@ async function verifyMicrophoneAccess() {
 function showMicPermissionModal() {
   const modal = document.getElementById("mic-permission-modal");
   if (modal) {
-    modal.classList.remove("hidden-modal");
     modal.style.display = "flex";
-    if (window.lucide) window.lucide.createIcons();
   }
 }
 
 function hideMicPermissionModal() {
   const modal = document.getElementById("mic-permission-modal");
   if (modal) {
-    modal.classList.add("hidden-modal");
     modal.style.display = "none";
   }
 }

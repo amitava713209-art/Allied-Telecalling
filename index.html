@@ -18,7 +18,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Allied Call">
-  <link rel="stylesheet" href="style.css?v=17">
+  <link rel="stylesheet" href="style.css?v=18">
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -399,23 +399,27 @@
 <!-- =============================================
      🎙️ MANDATORY MICROPHONE ACCESS MODAL
      ============================================= -->
-<div class="modal-overlay hidden-modal" id="mic-permission-modal" style="z-index: 99999;">
-  <div class="modal-box" style="max-width: 420px; text-align: center; padding: 1.75rem 1.5rem;">
-    <div style="width: 56px; height: 56px; background: #e0e7ff; color: #4f46e5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-      <i data-lucide="phone-call" style="width: 28px; height: 28px;"></i>
+<div id="mic-permission-modal" style="display:none; position:fixed; inset:0; z-index:999999; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; padding:1rem;">
+  <div style="background:#fff; border-radius:20px; width:100%; max-width:380px; padding:2rem 1.5rem; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3); position:relative;">
+    <div style="width:60px; height:60px; background:#e0e7ff; color:#4f46e5; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.25rem; font-size:1.75rem;">
+      📞
     </div>
-    <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;">Microphone Permission</h3>
-    <p style="font-size: 0.88rem; color: #475569; line-height: 1.5; margin-bottom: 1.25rem;">
+    <h3 style="font-size:1.2rem; font-weight:700; color:#0f172a; margin:0 0 0.6rem;">Microphone Permission</h3>
+    <p style="font-size:0.9rem; color:#475569; line-height:1.6; margin:0 0 1.25rem;">
       Please allow calls to use microphone to connect and place calls.
     </p>
-    <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 0.75rem; font-size: 0.8rem; color: #64748b; margin-bottom: 1.25rem; text-align: left;">
-      <strong>How to allow:</strong><br>
-      1. Tap the <strong>🔒 Lock icon</strong> in your browser address bar.<br>
-      2. Set <strong>Microphone</strong> to <strong>Allow</strong>.<br>
-      3. Tap the button below to continue calling.
+    <div style="background:#f1f5f9; border-radius:10px; padding:0.85rem 1rem; font-size:0.82rem; color:#475569; margin-bottom:1.5rem; text-align:left; line-height:1.7;">
+      <strong style="color:#1e293b;">How to allow:</strong><br>
+      1. Tap the 🔒 <strong>Lock icon</strong> in your browser address bar.<br>
+      2. Set <strong>Microphone</strong> → <strong>Allow</strong>.<br>
+      3. Tap the green button below.
     </div>
-    <button type="button" class="btn-primary" onclick="requestAndVerifyMicrophoneGate()" style="width: 100%; padding: 0.75rem; font-size: 0.95rem; font-weight: 600;">
-      <i data-lucide="phone-call"></i> Allow Calls to Use Microphone
+    <button
+      type="button"
+      onclick="requestAndVerifyMicrophoneGate()"
+      style="width:100%; padding:1rem 1.25rem; background:#16a34a; color:#fff; border:none; border-radius:12px; font-size:1rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:0.5rem; -webkit-tap-highlight-color:transparent; touch-action:manipulation;"
+    >
+      📞 Allow Calls to Use Microphone
     </button>
   </div>
 </div>
@@ -439,7 +443,7 @@
 </div>
 
 <!-- Scripts -->
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 <script>
 // ✅ Register Service Worker — required for PWA install prompt on Android/Chrome
 if ('serviceWorker' in navigator) {
