@@ -1500,41 +1500,20 @@ function escapeCsvString(str) {
   return str.replace(/"/g, '""');
 }
 
-// --- 🎙️ Mandatory Microphone Verification Gate ---
-async function verifyMicrophoneAccess() {
+// --- 🎙️ Microphone Recording Gate (Native Browser Permission) ---
+// No custom modal. Browser handles its own permission UI natively.
+// On first use, Chrome shows its own "Allow microphone?" popup automatically.
+// After that, permission is remembered forever - no more prompts.
+
+async function acquireMicrophoneAndRecord() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    // If granted, release temporary test stream
-    stream.getTracks().forEach(track => track.stop());
-    hideMicPermissionModal();
+    // This triggers Chrome's native permission popup if not yet granted.
+    // If already granted, it silently proceeds.
+    await startAutoCallRecording();
     return true;
   } catch (err) {
-    console.warn("Microphone access denied or blocked:", err);
-    showMicPermissionModal();
+    console.warn("Microphone not available:", err);
     return false;
-  }
-}
-
-function showMicPermissionModal() {
-  const modal = document.getElementById("mic-permission-modal");
-  if (modal) {
-    modal.style.display = "flex";
-  }
-}
-
-function hideMicPermissionModal() {
-  const modal = document.getElementById("mic-permission-modal");
-  if (modal) {
-    modal.style.display = "none";
-  }
-}
-
-async function requestAndVerifyMicrophoneGate() {
-  const granted = await verifyMicrophoneAccess();
-  if (granted) {
-    showToast("Audio Connected", "Audio connected. You can make calls now.", "success");
-  } else {
-    showToast("Audio Permission Required", "Please allow calls to use microphone to connect.", "error");
   }
 }
 
@@ -1547,19 +1526,11 @@ async function triggerClickToCall(targetMobile = null) {
     return;
   }
 
-  // 1. Mandatory Mic Gate Check: Block call if microphone is not permitted
-  const micOk = await verifyMicrophoneAccess();
-  if (!micOk) {
-    showToast("Audio Permission Required", "Please allow calls to use microphone to connect.", "error");
-    return;
-  }
+  // Start mic recording in background (browser will ask for permission if needed)
+  acquireMicrophoneAndRecord();
 
-  // 2. Auto-start recording before launching native SIM dialer
-  await startAutoCallRecording();
-
-  // 3. Trigger native SIM phone dialer
+  // Immediately launch phone dialer - no blocking gate
   window.location.href = `tel:${cleanMobile}`;
-  showToast("Connecting Call", `Initiating call for ${cleanMobile}...`, "info");
 }
 
 function triggerWhatsAppChat(targetMobile = null, targetName = "") {
