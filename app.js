@@ -2622,7 +2622,8 @@ async function handleCallerLogin(event) {
       'admin': { name: 'admin', pin: '1234', role: 'Admin', status: 'Active', boundDevice: '' },
       'jayeeta': { name: 'jayeeta', pin: '4321', role: 'Caller', status: 'Active', boundDevice: '' },
       'moupriya': { name: 'moupriya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' },
-      'priya': { name: 'priya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' }
+      'priya': { name: 'priya', pin: '1234', role: 'Caller', status: 'Active', boundDevice: '' },
+      'susmita': { name: 'susmita', pin: '4321', role: 'Caller', status: 'Active', boundDevice: '' }
     };
 
     const cleanUsername = nameVal.toLowerCase().trim();
