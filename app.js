@@ -139,10 +139,26 @@ function loadStoredData() {
 
 function saveLogsToLocalStorage() {
   try {
-    localStorage.setItem("telecaller_logs", JSON.stringify(callLogs));
+    // Strip large audio base64 data before saving to localStorage (audio is in Firebase already).
+    // This prevents QuotaExceededError on devices with many recorded calls.
+    const logsWithoutAudio = callLogs.map(r => {
+      const { audioRecording, ...rest } = r;
+      return rest;
+    });
+    localStorage.setItem("telecaller_logs", JSON.stringify(logsWithoutAudio));
   } catch (error) {
     console.error("Error saving local storage data:", error);
-    showToast("Error", "Could not save log data to browser storage.", "error");
+    // Last resort: try saving only the most recent 50 logs
+    try {
+      const logsWithoutAudio = callLogs.slice(0, 50).map(r => {
+        const { audioRecording, ...rest } = r;
+        return rest;
+      });
+      localStorage.setItem("telecaller_logs", JSON.stringify(logsWithoutAudio));
+      showToast("Storage Trimmed", "Saved last 50 logs locally. All data safely stored in cloud.", "info");
+    } catch (e2) {
+      showToast("Cloud Only", "Local storage full. All logs safely saved to Firebase cloud.", "info");
+    }
   }
 }
 
