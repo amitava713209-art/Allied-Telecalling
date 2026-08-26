@@ -18,7 +18,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Allied Call">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -207,6 +207,9 @@
             <label class="status-chip refused-chip">
               <input type="radio" name="call-status" value="Refused"> 🚫 Refused
             </label>
+            <label class="status-chip" style="background:#f1f5f9; border:1.5px solid #94a3b8; color:#475569;">
+              <input type="radio" name="call-status" value="Not Answered"> 📵 Not Answered
+            </label>
           </div>
         </div>
 
@@ -283,6 +286,7 @@
           <option value="Not Interested">👎 Not Interested</option>
           <option value="Lead">⭐ Lead</option>
           <option value="Refused">🚫 Refused</option>
+          <option value="Not Answered">📵 Not Answered</option>
         </select>
         <select id="filter-appointment" onchange="filterCallHistory()" class="filter-select">
           <option value="">All Appts</option>
@@ -417,7 +421,7 @@
 </div>
 
 <!-- Scripts -->
-<script src="app.js?v=20"></script>
+<script src="app.js?v=21"></script>
 <script>
 // ✅ Register Service Worker — required for PWA install prompt on Android/Chrome
 if ('serviceWorker' in navigator) {

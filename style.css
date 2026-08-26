@@ -769,6 +769,7 @@ button, input, select, textarea {
 .tbl-badge-refused     { background: #fff1f2; color: #be123c; }
 .tbl-badge-lead        { background: #faf5ff; color: #7e22ce; }
 .tbl-badge-refused.not-int { background: #f1f5f9; color: #475569; }
+.tbl-badge-not-answered { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
 /* ---- Sync Pills ---- */
 .sync-pill {

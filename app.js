@@ -966,6 +966,9 @@ function renderHistoryTable(filteredLogs = null) {
       } else if (record.status === "Lead") {
         statusClass = "tbl-badge-lead";
         statusIcon = "sparkles";
+      } else if (record.status === "Not Answered") {
+        statusClass = "tbl-badge-not-answered";
+        statusIcon = "phone-missed";
       }
       const statusCell = `
         <td>
@@ -1062,12 +1065,18 @@ function renderHistoryTable(filteredLogs = null) {
       if (record.status === "Interested") {
         statusClass = "tbl-badge-interested";
         statusIcon = "thumbs-up";
+      } else if (record.status === "Hot List") {
+        statusClass = "tbl-badge-hot-list";
+        statusIcon = "flame";
       } else if (record.status === "Not Interested") {
         statusClass = "tbl-badge-refused";
         statusIcon = "thumbs-down";
       } else if (record.status === "Lead") {
         statusClass = "tbl-badge-lead";
         statusIcon = "sparkles";
+      } else if (record.status === "Not Answered") {
+        statusClass = "tbl-badge-not-answered";
+        statusIcon = "phone-missed";
       }
 
       const remarksHtml = record.comments 
