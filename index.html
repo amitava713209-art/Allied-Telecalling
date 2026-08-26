@@ -18,7 +18,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Allied Call">
-  <link rel="stylesheet" href="style.css?v=21">
+  <link rel="stylesheet" href="style.css?v=22">
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -172,9 +172,9 @@
             <input type="number" id="customer-age" placeholder="Age" min="1" max="120" inputmode="numeric">
           </div>
           <div class="form-field">
-            <label>Gender <span class="req">*</span></label>
-            <select id="customer-gender" required>
-              <option value="" disabled selected>Select</option>
+            <label>Gender <span style="font-size:0.78rem; color:#94a3b8; font-weight:400;">(optional)</span></label>
+            <select id="customer-gender">
+              <option value="" selected>Unknown / Not answered</option>
               <option value="Male">Male</option>
               <option value="Female">Female</option>
             </select>
@@ -421,7 +421,7 @@
 </div>
 
 <!-- Scripts -->
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 <script>
 // ✅ Register Service Worker — required for PWA install prompt on Android/Chrome
 if ('serviceWorker' in navigator) {

@@ -990,6 +990,8 @@ button, input, select, textarea {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
+  position: relative;
+  z-index: 2;
 }
 
 .status-chip {

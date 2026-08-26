@@ -1929,7 +1929,7 @@ async function syncCentralLeadQueue(newLeads, replace = false) {
 let unsubscribeLeads = null;
 const LEADS_CACHE_KEY   = 'allied_leads_cache';
 const LEADS_CACHE_TS    = 'allied_leads_cache_ts';
-const CACHE_TTL_MS      = 4 * 60 * 60 * 1000; // 4 hours
+const CACHE_TTL_MS      = 30 * 60 * 1000; // 30 minutes — ensures Called status syncs across callers
 
 async function fetchCentralLeadQueue(forceSync = false) {
   if (!db) return;
@@ -2318,7 +2318,25 @@ function markLeadStatus(leadId, newStatus) {
   if (index !== -1) {
     leadQueue[index].status = newStatus;
     saveLeadQueueToLocalStorage();
+    // Also update the leads cache so other callers see it on next sync
+    localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
     renderLeadQueue();
+    // Write to Firestore so Jayeeta / other callers get updated status immediately
+    if (db) {
+      db.collection('leads').doc(leadId).update({ status: newStatus }).catch(() => {
+        // If doc doesn't exist by ID, try finding by mobile number
+        const lead = leadQueue[index];
+        if (lead && lead.mobile) {
+          db.collection('leads').where('mobile', '==', String(lead.mobile)).get().then(snap => {
+            if (!snap.empty) {
+              const batch = db.batch();
+              snap.forEach(doc => batch.update(doc.ref, { status: newStatus }));
+              batch.commit();
+            }
+          });
+        }
+      });
+    }
   }
 }
 
