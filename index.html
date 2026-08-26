@@ -18,7 +18,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Allied Call">
-  <link rel="stylesheet" href="style.css?v=27">
+  <link rel="stylesheet" href="style.css?v=28">
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -145,7 +145,7 @@
         <h2 id="form-header-title" class="form-title">Log New Call</h2>
       </div>
 
-      <form id="call-form" onsubmit="handleFormSubmit(event)" class="call-form" id="form-panel-section">
+      <form id="call-form" onsubmit="handleFormSubmit(event)" class="call-form">
         <div class="form-field">
           <label>Your Name</label>
           <input type="text" id="caller-name" placeholder="Enter your name" required autocomplete="off">
@@ -421,7 +421,7 @@
 </div>
 
 <!-- Scripts -->
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 <script>
 // ✅ Register Service Worker — required for PWA install prompt on Android/Chrome
 if ('serviceWorker' in navigator) {

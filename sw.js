@@ -1,7 +1,7 @@
 /* Allied Telecalling PWA Service Worker
    Version: 2.0 — Mobile-First Build */
 
-const CACHE_NAME = 'allied-call-v27';
+const CACHE_NAME = 'allied-call-v28';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
