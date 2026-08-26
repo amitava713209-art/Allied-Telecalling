@@ -598,6 +598,29 @@ function handleFormSubmit(event) {
     return;
   }
 
+  // Validate status selected
+  if (!status) {
+    showToast("Required Field", "Please select a Call Result before saving.", "error");
+    return;
+  }
+
+  // Helper: match lead by mobile number robustly (strip non-digits)
+  function findLeadByMobile(mob) {
+    const clean = String(mob).replace(/[^0-9]/g, "").slice(-10);
+    return leadQueue.find(l => String(l.mobile).replace(/[^0-9]/g, "").slice(-10) === clean);
+  }
+
+  // Helper: mark lead as Called and persist to localStorage + LEADS_CACHE_KEY
+  function markLeadCalledLocally(mob) {
+    const qItem = findLeadByMobile(mob);
+    if (qItem) {
+      qItem.status = "Called";
+      saveLeadQueueToLocalStorage();
+      localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
+      renderLeadQueue();
+    }
+  }
+
   // 2. Handle Save logic for New vs Updated Record
   if (editingRecordId !== null) {
     // --- EDIT EXISTING CLIENT ---
@@ -607,7 +630,7 @@ function handleFormSubmit(event) {
       
       const updatedRecord = {
         id: origRecord.id,
-        timestamp: origRecord.timestamp, // Keep original timestamp
+        timestamp: origRecord.timestamp,
         name: name,
         mobile: mobile,
         age: age,
@@ -620,34 +643,18 @@ function handleFormSubmit(event) {
         comments: comments,
         addedBy: addedBy,
         audioRecording: recordedAudioBase64 || origRecord.audioRecording || null,
-        syncStatus: "Pending" // Retrigger sync upload
+        syncStatus: "Pending"
       };
 
       callLogs[index] = updatedRecord;
       saveLogsToLocalStorage();
-      
-      // Auto-mark lead queue item as called
-      const qItem = leadQueue.find(l => l.mobile === mobile);
-      if (qItem) {
-        qItem.status = "Called";
-        saveLeadQueueToLocalStorage();
-        renderLeadQueue();
-      }
-
-      // Render layout updates
+      markLeadCalledLocally(mobile);
       renderHistoryTable();
       recalculateAnalytics();
-      
-      // Upload updated data to sheet
       triggerSheetSync(updatedRecord.id);
       showToast("Record Updated", `Updated details for customer "${name}".`, "success");
-      
       resetForm();
-
-      // If mobile screen size, auto-switch back to History tab
-      if (window.innerWidth <= 768) {
-        switchMobileTab('history');
-      }
+      if (window.innerWidth <= 768) switchMobileTab('history');
     }
   } else {
     // --- CREATE NEW CLIENT RECORD ---
@@ -671,28 +678,13 @@ function handleFormSubmit(event) {
 
     callLogs.unshift(newRecord);
     saveLogsToLocalStorage();
-
-    // Auto-mark lead queue item as called
-    const qItem = leadQueue.find(l => l.mobile === mobile);
-    if (qItem) {
-      qItem.status = "Called";
-      saveLeadQueueToLocalStorage();
-      renderLeadQueue();
-    }
-
+    markLeadCalledLocally(mobile);
     renderHistoryTable();
     recalculateAnalytics();
-    
-    // Trigger Sheet Sync
     triggerSheetSync(newRecord.id);
     showToast("Record Logged", `Customer "${name}" recorded successfully.`, "success");
-    
     resetForm();
-
-    // If mobile screen size, switch back to History tab to see the new entry
-    if (window.innerWidth <= 768) {
-      switchMobileTab('history');
-    }
+    if (window.innerWidth <= 768) switchMobileTab('history');
   }
 }
 
