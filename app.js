@@ -216,29 +216,7 @@ function toggleBiField() {
 }
 
 // --- Mobile Tab Switching Logic ---
-function switchMobileTab(tab) {
-  const formPanel = document.getElementById("form-panel-section");
-  const tablePanel = document.getElementById("table-panel-section");
-  const navBtnForm = document.getElementById("nav-btn-form");
-  const navBtnHistory = document.getElementById("nav-btn-history");
-
-  if (!formPanel || !tablePanel) return;
-
-  if (tab === 'form') {
-    formPanel.classList.remove("mobile-hidden");
-    tablePanel.classList.add("mobile-hidden");
-    if (navBtnForm) navBtnForm.classList.add("active");
-    if (navBtnHistory) navBtnHistory.classList.remove("active");
-  } else {
-    formPanel.classList.add("mobile-hidden");
-    tablePanel.classList.remove("mobile-hidden");
-    if (navBtnForm) navBtnForm.classList.remove("active");
-    if (navBtnHistory) navBtnHistory.classList.add("active");
-    
-    // Rerender table to adapt layout dimensions immediately
-    renderHistoryTable();
-  }
-}
+// switchMobileTab is defined later in the file using the correct panel IDs (tab-queue, tab-form, tab-history)
 
 // --- ✏️ CRM Live Pencil Editing Mode ---
 function editRecord(recordId) {
