@@ -18,7 +18,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Allied Call">
-  <link rel="stylesheet" href="style.css?v=22">
+  <link rel="stylesheet" href="style.css?v=23">
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -186,7 +186,7 @@
           <input type="text" id="customer-city" placeholder="City name">
         </div>
 
-        <div class="form-field">
+        <div class="form-field" style="position:relative; z-index:3;">
           <label>Call Result <span class="req">*</span></label>
           <div class="status-grid">
             <label class="status-chip hot-chip">
@@ -207,14 +207,14 @@
             <label class="status-chip refused-chip">
               <input type="radio" name="call-status" value="Refused"> 🚫 Refused
             </label>
-            <label class="status-chip" style="background:#f1f5f9; border:1.5px solid #94a3b8; color:#475569;">
+            <label class="status-chip notanswered-chip">
               <input type="radio" name="call-status" value="Not Answered"> 📵 Not Answered
             </label>
           </div>
         </div>
 
         <!-- 📅 APPOINTMENT / MEETING SCHEDULER -->
-        <div class="appointment-card-box" id="appointment-toggle-row">
+        <div class="appointment-card-box" id="appointment-toggle-row" style="position:relative; z-index:1; margin-top:0.5rem;">
           <label class="appointment-toggle-label">
             <input type="checkbox" id="appointment-given" onchange="toggleAppointmentField()">
             <div class="appt-checkbox-content">
@@ -421,7 +421,7 @@
 </div>
 
 <!-- Scripts -->
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 <script>
 // ✅ Register Service Worker — required for PWA install prompt on Android/Chrome
 if ('serviceWorker' in navigator) {

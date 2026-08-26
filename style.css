@@ -1032,6 +1032,9 @@ button, input, select, textarea {
 .refused-chip { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 .refused-chip:has(input:checked) { background: #ffedd5; border-color: #f97316; box-shadow: 0 0 0 3px rgba(194,65,12,0.15); }
 
+.notanswered-chip { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+.notanswered-chip:has(input:checked) { background: #e2e8f0; border-color: #64748b; box-shadow: 0 0 0 3px rgba(100,116,139,0.15); }
+
 /* ---- Audio Row ---- */
 .audio-row {
   display: flex;

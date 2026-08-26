@@ -1983,7 +1983,9 @@ async function fetchCentralLeadQueue(forceSync = false) {
 function mergeLeadQueue(remoteQueue) {
   if (!remoteQueue || !Array.isArray(remoteQueue) || remoteQueue.length === 0) return;
   const map = new Map();
-  // Add remote queue items first so fresh central leads overwrite stale local cache
+
+  // Remote (Firestore) is always the source of truth for status
+  // This ensures Jayeeta sees "Called" when Moupriya has logged a call
   remoteQueue.forEach((item, idx) => {
     if (item) {
       const mob = item.mobile ? String(item.mobile).replace(/[^0-9]/g, "") : "";
@@ -1997,19 +1999,13 @@ function mergeLeadQueue(remoteQueue) {
         city: sanitizeText(item.city),
         category: sanitizeText(item.category),
         sourceFile: sanitizeText(item.sourceFile) || "General Batch",
+        // Remote status wins — if Moupriya marked "Called" in Firestore, Jayeeta sees "Called"
         status: item.status || "Pending"
       };
       map.set(key, cleanItem);
     }
   });
-  // Preserve any local call status updates (Called / Hot List) set by callers
-  leadQueue.forEach(item => {
-    if (item && item.mobile && map.has(item.mobile)) {
-      if (item.status === "Called" || item.status === "Hot List") {
-        map.get(item.mobile).status = item.status;
-      }
-    }
-  });
+
   leadQueue = Array.from(map.values());
 }
 
