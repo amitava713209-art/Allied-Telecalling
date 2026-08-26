@@ -137,28 +137,56 @@ function loadStoredData() {
   }
 }
 
-function saveLogsToLocalStorage() {
+// --- IndexedDB fallback for call logs (used when localStorage quota is exceeded) ---
+function openLogsDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('callLogsDB', 1);
+    request.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('logs')) {
+        db.createObjectStore('logs', { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = e => resolve(e.target.result);
+    request.onerror = e => reject(e.target.error);
+  });
+}
+
+async function saveLogsToIndexedDB() {
   try {
-    // Strip large audio base64 data before saving to localStorage (audio is in Firebase already).
-    // This prevents QuotaExceededError on devices with many recorded calls.
+    const db = await openLogsDB();
+    const tx = db.transaction('logs', 'readwrite');
+    const store = tx.objectStore('logs');
+    // clear previous entries then bulk add current logs (without audio to keep size low)
+    await new Promise(r => store.clear().onsuccess = r);
     const logsWithoutAudio = callLogs.map(r => {
       const { audioRecording, ...rest } = r;
       return rest;
     });
-    localStorage.setItem("telecaller_logs", JSON.stringify(logsWithoutAudio));
+    logsWithoutAudio.forEach(l => store.put(l));
+    return new Promise((res, rej) => {
+      tx.oncomplete = () => res();
+      tx.onerror = e => rej(e.target.error);
+    });
+  } catch (e) {
+    console.error('IndexedDB save failed', e);
+    throw e;
+  }
+}
+
+// Updated saveLogsToLocalStorage with IndexedDB fallback
+function saveLogsToLocalStorage() {
+  try {
+    const logsWithoutAudio = callLogs.map(r => {
+      const { audioRecording, ...rest } = r;
+      return rest;
+    });
+    localStorage.setItem('telecaller_logs', JSON.stringify(logsWithoutAudio));
   } catch (error) {
-    console.error("Error saving local storage data:", error);
-    // Last resort: try saving only the most recent 50 logs
-    try {
-      const logsWithoutAudio = callLogs.slice(0, 50).map(r => {
-        const { audioRecording, ...rest } = r;
-        return rest;
-      });
-      localStorage.setItem("telecaller_logs", JSON.stringify(logsWithoutAudio));
-      showToast("Storage Trimmed", "Saved last 50 logs locally. All data safely stored in cloud.", "info");
-    } catch (e2) {
-      showToast("Cloud Only", "Local storage full. All logs safely saved to Firebase cloud.", "info");
-    }
+    console.warn('LocalStorage full or unavailable, falling back to IndexedDB', error);
+    saveLogsToIndexedDB().catch(e => {
+      showToast('Storage Error', 'Unable to persist call logs locally.', 'error');
+    });
   }
 }
 
