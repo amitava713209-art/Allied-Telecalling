@@ -562,6 +562,7 @@ function updateSyncBadge() {
 // --- Form Validation & Submission ---
 function handleFormSubmit(event) {
   event.preventDefault();
+  try {
 
   const agentInput = document.getElementById("caller-name");
   const nameInput = document.getElementById("customer-name");
@@ -707,6 +708,14 @@ function handleFormSubmit(event) {
     showToast("Record Logged", `Customer "${name}" recorded successfully.`, "success");
     resetForm();
     if (window.innerWidth <= 768) switchMobileTab('history');
+  }
+
+  } catch (err) {
+    alert('SAVE ERROR: ' + (err.message || err));
+    console.error('handleFormSubmit error:', err);
+    if (typeof showToast === 'function') {
+      showToast('Save Error', err.message || String(err), 'error');
+    }
   }
 }
 
@@ -2836,3 +2845,18 @@ function testSheetConnection() {
     }
   }
 }
+window.addEventListener('error', function (e) {
+  // Show any uncaught JS errors as a toast so the user can see the message on mobile
+  if (typeof showToast === 'function') {
+    showToast('JS Error', e.message || String(e), 'error');
+  }
+  console.error(e);
+});
+
+window.addEventListener('unhandledrejection', function (e) {
+  const msg = e && e.reason && e.reason.message ? e.reason.message : String(e.reason || e);
+  if (typeof showToast === 'function') {
+    showToast('Promise Rejection', msg, 'error');
+  }
+  console.error('Unhandled Promise Rejection:', e);
+});
