@@ -233,13 +233,15 @@ function toggleBiField() {
   const biProductGroup = document.getElementById("bi-product-group");
   const biProductSelect = document.getElementById("bi-product");
 
-  if (biRequiredCheckbox.checked) {
-    biProductGroup.classList.add("active");
-    biProductSelect.required = true;
+  if (biRequiredCheckbox && biRequiredCheckbox.checked) {
+    if (biProductGroup) biProductGroup.classList.add("active");
+    if (biProductSelect) biProductSelect.required = true;
   } else {
-    biProductGroup.classList.remove("active");
-    biProductSelect.required = false;
-    biProductSelect.value = "";
+    if (biProductGroup) biProductGroup.classList.remove("active");
+    if (biProductSelect) {
+      biProductSelect.required = false;
+      biProductSelect.value = "";
+    }
   }
 }
 
@@ -288,9 +290,10 @@ function editRecord(recordId) {
 
   // Set BI fields
   const biToggle = document.getElementById("bi-required");
-  biToggle.checked = record.biRequired;
+  if (biToggle) biToggle.checked = record.biRequired;
   if (record.biRequired) {
-    document.getElementById("bi-product").value = record.biProduct || "";
+    const biProduct = document.getElementById("bi-product");
+    if (biProduct) biProduct.value = record.biProduct || "";
   }
 
   // Set comments & agent
@@ -758,14 +761,21 @@ function resetForm() {
   }
   
   // Reset visibility states
-  document.getElementById("appointment-date-group").classList.remove("active");
-  document.getElementById("appointment-date").required = false;
-  document.getElementById("appointment-date").value = "";
+  const appointmentDateGroup = document.getElementById("appointment-date-group");
+  const appointmentDate = document.getElementById("appointment-date");
+  if (appointmentDateGroup) appointmentDateGroup.classList.remove("active");
+  if (appointmentDate) {
+    appointmentDate.required = false;
+    appointmentDate.value = "";
+  }
 
-  document.getElementById("bi-product-group").classList.remove("active");
-  document.getElementById("bi-product").required = false;
-  document.getElementById("bi-product").value = "";
-
+  const biProductGroup = document.getElementById("bi-product-group");
+  const biProduct = document.getElementById("bi-product");
+  if (biProductGroup) biProductGroup.classList.remove("active");
+  if (biProduct) {
+    biProduct.required = false;
+    biProduct.value = "";
+  }
   document.getElementById("customer-gender").value = "";
 
   handleStatusChange();
