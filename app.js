@@ -638,8 +638,15 @@ function handleFormSubmit(event) {
     const qItem = findLeadByMobile(mob);
     if (qItem) {
       qItem.status = "Called";
-      saveLeadQueueToLocalStorage();
-      localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
+      try {
+        saveLeadQueueToLocalStorage();
+        localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
+      } catch (e) {
+        console.warn("Storage quota exceeded while caching leads. Proceeding anyway.", e);
+        if (typeof showToast === 'function') {
+          showToast("Storage Warning", "Lead cached failed due to storage limits, but log is saved.", "warning");
+        }
+      }
       renderLeadQueue();
     }
   }
@@ -1989,8 +1996,12 @@ async function fetchCentralLeadQueue(forceSync = false) {
     mergeLeadQueue(remoteQueue);
 
     // Save fresh data + timestamp to localStorage cache
-    localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
-    localStorage.setItem(LEADS_CACHE_TS, String(Date.now()));
+    try {
+      localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
+      localStorage.setItem(LEADS_CACHE_TS, String(Date.now()));
+    } catch(e) {
+      console.warn('Quota exceeded when caching leads from Firestore', e);
+    }
     saveLeadQueueToLocalStorage();
     renderLeadQueue();
 
@@ -2033,7 +2044,11 @@ function mergeLeadQueue(remoteQueue) {
 }
 
 function saveLeadQueueToLocalStorage() {
-  localStorage.setItem("telecaller_lead_queue", JSON.stringify(leadQueue));
+  try {
+    localStorage.setItem("telecaller_lead_queue", JSON.stringify(leadQueue));
+  } catch(e) {
+    console.warn("Could not save lead queue to localStorage due to quota.", e);
+  }
 }
 
 // ============================================================
@@ -2338,7 +2353,11 @@ function markLeadStatus(leadId, newStatus) {
     leadQueue[index].status = newStatus;
     saveLeadQueueToLocalStorage();
     // Also update the leads cache so other callers see it on next sync
-    localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
+    try {
+      localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
+    } catch(e) {
+      console.warn("Quota exceeded caching lead status", e);
+    }
     renderLeadQueue();
     // Write to Firestore so Jayeeta / other callers get updated status immediately
     if (db) {
