@@ -1274,6 +1274,7 @@ function filterCallHistory() {
 
     const matchesSearch = recName.includes(searchInput) || 
                           recMobile.includes(searchInput) ||
+                          (searchInput.replace(/[^0-9]/g, "").length >= 4 && recMobile.replace(/[^0-9]/g, "").slice(-10).includes(searchInput.replace(/[^0-9]/g, "").slice(-10))) ||
                           recComments.includes(searchInput) ||
                           recAddedBy.includes(searchInput);
     
@@ -2303,6 +2304,8 @@ function renderLeadQueue(leadsToShow) {
 // Search / filter the lead queue
 function filterLeadQueue(query) {
   const q = (query || '').toLowerCase().trim();
+  const qCleanMobile = q.replace(/[^0-9]/g, "").slice(-10);
+
   if (!q) {
     renderLeadQueue();
     return;
@@ -2310,9 +2313,15 @@ function filterLeadQueue(query) {
   const filtered = leadQueue.filter(l => {
     const name = (l.name || '').toLowerCase();
     const mobile = String(l.mobile || '').toLowerCase();
+    const cleanMobile = mobile.replace(/[^0-9]/g, "").slice(-10);
     const category = (l.category || '').toLowerCase();
     const city = (l.city || '').toLowerCase();
-    return name.includes(q) || mobile.includes(q) || category.includes(q) || city.includes(q);
+    
+    return name.includes(q) || 
+           mobile.includes(q) || 
+           (qCleanMobile.length >= 4 && cleanMobile.includes(qCleanMobile)) || 
+           category.includes(q) || 
+           city.includes(q);
   });
   renderLeadQueue(filtered);
 }
