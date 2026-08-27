@@ -642,8 +642,9 @@ function handleFormSubmit(event) {
     if (qItem) {
       qItem.status = "Called";
       try {
-        saveLeadQueueToLocalStorage();
-        localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(leadQueue));
+        const stringified = JSON.stringify(leadQueue);
+        localStorage.setItem("telecaller_lead_queue", stringified);
+        localStorage.setItem(LEADS_CACHE_KEY, stringified);
       } catch (e) {
         console.warn("Storage quota exceeded while caching leads. Proceeding anyway.", e);
         if (typeof showToast === 'function') {
@@ -959,7 +960,9 @@ function renderHistoryTable(filteredLogs = null) {
   if (tableBody) tableBody.innerHTML = "";
   if (mobileCardsList) mobileCardsList.innerHTML = "";
 
-  activeLogs.forEach(record => {
+  const visibleLogs = activeLogs.slice(0, 100);
+
+  visibleLogs.forEach(record => {
     // RENDER DESKTOP TABULAR VIEW
     if (tableBody) {
       const tr = document.createElement("tr");
