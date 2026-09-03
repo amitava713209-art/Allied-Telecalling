@@ -2309,7 +2309,7 @@ function renderLeadQueue(leadsToShow) {
   if (displayList.length > window.leadDisplayLimit) {
     const loadMoreBtn = document.createElement('button');
     loadMoreBtn.className = 'btn-secondary';
-    loadMoreBtn.style.cssText = 'width: 100%; margin-top: 1rem; padding: 0.75rem; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 600; color: #475569;';
+    loadMoreBtn.style.cssText = 'width: 100%; margin-top: 1rem; padding: 0.75rem; border-radius: 8px; border: 1px solid #ca8a04; background: #fef08a; font-weight: 700; color: #854d0e; font-size: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);';
     loadMoreBtn.innerHTML = `Load Next 100 Leads (${displayList.length - window.leadDisplayLimit} remaining)`;
     loadMoreBtn.onclick = () => {
       window.leadDisplayLimit += 100;
