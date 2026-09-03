@@ -1617,6 +1617,7 @@ function sanitizeText(str) {
 
 function switchLeadDirectory(dirName) {
   activeBatchDirectory = dirName || "ALL";
+  window.leadDisplayLimit = 100;
   renderLeadQueue();
 }
 
@@ -2257,8 +2258,15 @@ function renderLeadQueue(leadsToShow) {
     return;
   }
 
-  // Limit to 100 visible cards for fast performance
-  const visibleLeads = displayList.slice(0, 100);
+  // Sort list to push 'Called' leads to the bottom, keeping 'Hot List' and 'Pending' at the top
+  displayList.sort((a, b) => {
+    const getVal = (s) => s === 'Hot List' ? 0 : (s === 'Pending' ? 1 : 2);
+    return getVal(a.status) - getVal(b.status);
+  });
+
+  // Limit to visible cards for fast performance (default 100)
+  if (typeof window.leadDisplayLimit === 'undefined') window.leadDisplayLimit = 100;
+  const visibleLeads = displayList.slice(0, window.leadDisplayLimit);
   container.innerHTML = '';
 
   visibleLeads.forEach(lead => {
@@ -2297,6 +2305,18 @@ function renderLeadQueue(leadsToShow) {
     `;
     container.appendChild(card);
   });
+
+  if (displayList.length > window.leadDisplayLimit) {
+    const loadMoreBtn = document.createElement('button');
+    loadMoreBtn.className = 'btn-secondary';
+    loadMoreBtn.style.cssText = 'width: 100%; margin-top: 1rem; padding: 0.75rem; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-weight: 600; color: #475569;';
+    loadMoreBtn.innerHTML = `Load Next 100 Leads (${displayList.length - window.leadDisplayLimit} remaining)`;
+    loadMoreBtn.onclick = () => {
+      window.leadDisplayLimit += 100;
+      renderLeadQueue();
+    };
+    container.appendChild(loadMoreBtn);
+  }
 
   if (window.lucide) window.lucide.createIcons();
 }
