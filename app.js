@@ -815,7 +815,15 @@ async function triggerSheetSync(recordId) {
       audioBase64: record.audioRecording || ""
     };
 
-    // 1. Upload to Call Logs collection
+    // 1. Upload to Call Logs collection (Firestore has a 1MB document limit)
+    // If the base64 audio is too large, it will crash the sync.
+    if (payload.audioBase64 && payload.audioBase64.length > 900000) {
+      payload.audioBase64 = ""; // Remove audio to prevent 1MB limit crash
+      if (typeof showToast === 'function') {
+        showToast("Audio Too Large", "The voice note was too long to upload to the database, but the text log will be saved.", "warning");
+      }
+    }
+    
     await db.collection('call_logs').doc(recordId).set(payload);
 
     // 2. Update Lead Queue document if mobile matches
@@ -2257,12 +2265,6 @@ function renderLeadQueue(leadsToShow) {
     if (window.lucide) window.lucide.createIcons();
     return;
   }
-
-  // Sort list to push 'Called' leads to the bottom, keeping 'Hot List' and 'Pending' at the top
-  displayList.sort((a, b) => {
-    const getVal = (s) => s === 'Hot List' ? 0 : (s === 'Pending' ? 1 : 2);
-    return getVal(a.status) - getVal(b.status);
-  });
 
   // Limit to visible cards for fast performance (default 100)
   if (typeof window.leadDisplayLimit === 'undefined') window.leadDisplayLimit = 100;
