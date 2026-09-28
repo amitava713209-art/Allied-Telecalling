@@ -339,6 +339,25 @@ async function fetchRemoteLogs() {
     if (records.length > 0) {
       mergeLogs(records);
       saveLogsToLocalStorage();
+
+      // Architecture upgrade: Sync 'Called' statuses using just the 200 call logs (0 extra reads!)
+      let queueUpdated = false;
+      records.forEach(rec => {
+        if (rec && rec.mobile) {
+          const clean = String(rec.mobile).replace(/[^0-9]/g, "").slice(-10);
+          const leadItem = leadQueue.find(l => String(l.mobile).replace(/[^0-9]/g, "").slice(-10) === clean);
+          if (leadItem && leadItem.status !== "Called") {
+            leadItem.status = "Called";
+            queueUpdated = true;
+          }
+        }
+      });
+      if (queueUpdated) {
+        saveLeadQueueToLocalStorage();
+        try { localStorage.setItem('allied_leads_cache', JSON.stringify(leadQueue)); } catch(e){}
+        renderLeadQueue();
+      }
+
       filterCallHistory();
       recalculateAnalytics();
       updateSyncBadge();
@@ -826,14 +845,11 @@ async function triggerSheetSync(recordId) {
     
     await db.collection('call_logs').doc(recordId).set(payload);
 
-    // 2. Update Lead Queue document if mobile matches
-    const leadsSnapshot = await db.collection('leads').where('mobile', '==', record.mobile).get();
-    if (!leadsSnapshot.empty) {
-      const batch = db.batch();
-      leadsSnapshot.forEach(doc => {
-        batch.update(doc.ref, { status: "Called" });
-      });
-      await batch.commit();
+    // 2. Update Lead Queue document (0 reads!)
+    const cleanMobile = String(record.mobile).replace(/[^0-9]/g, "").slice(-10);
+    const matchedLead = leadQueue.find(l => String(l.mobile).replace(/[^0-9]/g, "").slice(-10) === cleanMobile);
+    if (matchedLead && matchedLead.id) {
+      await db.collection('leads').doc(matchedLead.id).update({ status: "Called" }).catch(()=>console.log("Lead status update failed"));
     }
 
     callLogs[index].syncStatus = "Synced";
@@ -1982,7 +1998,7 @@ async function syncCentralLeadQueue(newLeads, replace = false) {
 let unsubscribeLeads = null;
 const LEADS_CACHE_KEY   = 'allied_leads_cache';
 const LEADS_CACHE_TS    = 'allied_leads_cache_ts';
-const CACHE_TTL_MS      = 30 * 60 * 1000; // 30 minutes — ensures Called status syncs across callers
+const CACHE_TTL_MS      = 100 * 365 * 24 * 60 * 60 * 1000; // Never auto-expire. Rely on manual sync and callLog diffing
 
 async function fetchCentralLeadQueue(forceSync = false) {
   if (!db) return;
