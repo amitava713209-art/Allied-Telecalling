@@ -1806,9 +1806,12 @@ async function handleExcelUpload(event) {
     try {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+      let rawRows = [];
+      workbook.SheetNames.forEach(sheetName => {
+        const worksheet = workbook.Sheets[sheetName];
+        const sheetRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+        rawRows = rawRows.concat(sheetRows);
+      });
 
       if (!rawRows || rawRows.length === 0) {
         showToast("Empty File", "The uploaded Excel file contains no readable rows.", "error");
