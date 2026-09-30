@@ -39,6 +39,7 @@ let editingRecordId = null;
 document.addEventListener("DOMContentLoaded", () => {
   // 0. Check Security Access Authentication
   checkCallerSecurityAccess();
+  enforceSecurityStatus();
 
   // 1. Load data from LocalStorage
   loadStoredData();
@@ -2671,6 +2672,24 @@ function getStableDeviceId() {
 }
 
 // --- AUTH CHECK: show or hide the login modal ---
+async function enforceSecurityStatus() {
+  if (!db) return;
+  let name = '';
+  try { name = localStorage.getItem('telecaller_agent_name') || sessionStorage.getItem('telecaller_agent_name'); } catch(e){}
+  if (name) {
+    try {
+      const doc = await db.collection('users').doc(name.toLowerCase()).get();
+      if (doc.exists && doc.data().status && doc.data().status.toLowerCase() !== 'active') {
+        try { localStorage.removeItem("telecaller_auth_token"); } catch(e) {}
+        try { sessionStorage.removeItem("telecaller_auth_token"); } catch(e) {}
+        location.reload();
+      }
+    } catch (e) {
+      // Ignore if offline
+    }
+  }
+}
+
 function checkCallerSecurityAccess() {
   let token = '', name = '', role = 'Caller';
   try { token = localStorage.getItem('telecaller_auth_token') || sessionStorage.getItem('telecaller_auth_token'); } catch(e){}
